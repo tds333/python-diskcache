@@ -56,7 +56,6 @@ DEFAULT_SETTINGS = {
     "sqlite_mmap_size": 2**26,  # 64mb
     # "sqlite_synchronous": 1,  # NORMAL
     "sqlite_synchronous": 0,  # OFF
-    "disk_min_file_size": 2**15,  # 32kb
     "disk_pickle_protocol": pickle.HIGHEST_PROTOCOL,
 }
 
@@ -96,16 +95,14 @@ EVICTION_POLICY = {
 class Disk:
     """Cache key and value serialization for SQLite database and files."""
 
-    def __init__(self, directory, min_file_size=0, pickle_protocol=0):
+    def __init__(self, directory, pickle_protocol=0):
         """Initialize disk instance.
 
         :param str directory: directory path
-        :param int min_file_size: minimum size for file use
         :param int pickle_protocol: pickle protocol for serialization
 
         """
         self._directory = directory
-        self.min_file_size = min_file_size
         self.pickle_protocol = pickle_protocol
 
     def hash(self, key):

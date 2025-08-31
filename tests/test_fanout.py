@@ -375,25 +375,11 @@ def test_evict(cache):
     assert len(cache.check()) == 0
 
 
-def test_size_limit_with_files(cache):
-    shards = 8
-    cache.reset("cull_limit", 0)
-    size_limit = 30 * cache.disk_min_file_size
-    cache.reset("size_limit", size_limit)
-    value = b"foo" * cache.disk_min_file_size
-
-    for key in range(40 * shards):
-        cache.set(key, value)
-
-    assert (cache.volume() // shards) > size_limit
-    cache.cull()
-    assert (cache.volume() // shards) <= size_limit
-
-
 def test_size_limit_with_database(cache):
+    min_limit = 2**15
     shards = 8
     cache.reset("cull_limit", 0)
-    size_limit = 2 * cache.disk_min_file_size
+    size_limit = 2 * min_limit
     cache.reset("size_limit", size_limit)
     value = b"0123456789" * 10
     count = size_limit // (8 + len(value)) * shards

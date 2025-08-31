@@ -46,36 +46,30 @@ def test_init_path(cache):
 
 
 def test_init_disk():
-    with dc.Cache(disk_pickle_protocol=1, disk_min_file_size=2**20) as cache:
+    with dc.Cache(disk_pickle_protocol=1) as cache:
         key = (None, 0, "abc")
         cache[key] = 0
         cache.check()
-        assert cache.disk_min_file_size == 2**20
         assert cache.disk_pickle_protocol == 1
     shutil.rmtree(cache.directory, ignore_errors=True)
 
 
 def test_disk_reset():
-    with dc.Cache(disk_min_file_size=0, disk_pickle_protocol=0) as cache:
+    with dc.Cache(disk_pickle_protocol=0) as cache:
         value = (None, 0, "abc")
 
         cache[0] = value
         cache.check()
 
-        assert cache.disk_min_file_size == 0
         assert cache.disk_pickle_protocol == 0
-        assert cache._disk.min_file_size == 0
         assert cache._disk.pickle_protocol == 0
 
-        cache.reset("disk_min_file_size", 2**10)
         cache.reset("disk_pickle_protocol", 2)
 
         cache[1] = value
         cache.check()
 
-        assert cache.disk_min_file_size == 2**10
         assert cache.disk_pickle_protocol == 2
-        assert cache._disk.min_file_size == 2**10
         assert cache._disk.pickle_protocol == 2
 
     shutil.rmtree(cache.directory, ignore_errors=True)
@@ -1003,10 +997,11 @@ def test_pragmas(cache):
 
 
 def test_size_limit_with_files(cache):
+    min_limit = 2**15
     cache.reset("cull_limit", 0)
-    size_limit = 30 * cache.disk_min_file_size
+    size_limit = 30 * min_limit
     cache.reset("size_limit", size_limit)
-    value = b"foo" * cache.disk_min_file_size
+    value = b"foo" * min_limit
 
     for key in range(40):
         cache.set(key, value)
@@ -1017,8 +1012,9 @@ def test_size_limit_with_files(cache):
 
 
 def test_size_limit_with_database(cache):
+    min_limit = 2**15
     cache.reset("cull_limit", 0)
-    size_limit = 2 * cache.disk_min_file_size
+    size_limit = 2 * min_limit
     cache.reset("size_limit", size_limit)
     value = b"0123456789" * 10
     count = size_limit // (8 + len(value))
@@ -1032,8 +1028,9 @@ def test_size_limit_with_database(cache):
 
 
 def test_cull_eviction_policy_none(cache):
+    min_limit = 2**15
     cache.reset("eviction_policy", "none")
-    size_limit = 2 * cache.disk_min_file_size
+    size_limit = 2 * min_limit
     cache.reset("size_limit", size_limit)
     value = b"0123456789" * 10
     count = size_limit // (8 + len(value))
@@ -1047,8 +1044,9 @@ def test_cull_eviction_policy_none(cache):
 
 
 def test_cull_size_limit_0(cache):
+    min_limit = 2**15
     cache.reset("cull_limit", 0)
-    size_limit = 2 * cache.disk_min_file_size
+    size_limit = 2 * min_limit
     cache.reset("size_limit", 0)
     value = b"0123456789" * 10
     count = size_limit // (8 + len(value))
