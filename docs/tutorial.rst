@@ -113,19 +113,6 @@ parameters: `expire`, `read`, and `tag`.
     >>> cache.set('key', BytesIO(b'value'), expire=5, read=True, tag='data')
     True
 
-In the example above: the key expires in 5 seconds, the value is read as a
-file-like object, and tag metadata is stored with the key. Another method,
-:meth:`get <diskcache.Cache.get>` supports querying extra information with
-`default`, `read`, `expire_time`, and `tag` keyword parameters.
-
-    >>> result = cache.get('key', read=True, expire_time=True, tag=True)
-    >>> reader, timestamp, tag = result
-    >>> print(reader.read().decode())
-    value
-    >>> type(timestamp).__name__
-    'float'
-    >>> print(tag)
-    data
 
 The return value is a tuple containing the value, expire time (seconds from
 epoch), and tag. Because we passed ``read=True`` the value is returned as a

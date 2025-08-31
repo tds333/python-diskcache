@@ -16,9 +16,7 @@ from .persistent import Deque, Index
 class FanoutCache:
     """Cache that shards keys and values."""
 
-    def __init__(
-        self, directory=None, shards=8, timeout=0.010, disk=Disk, **settings
-    ):
+    def __init__(self, directory=None, shards=8, timeout=0.010, disk=Disk, **settings):
         """Initialize cache instance.
 
         :param str directory: cache directory
@@ -29,20 +27,20 @@ class FanoutCache:
 
         """
         if directory is None:
-            directory = tempfile.mkdtemp(prefix='diskcache-')
+            directory = tempfile.mkdtemp(prefix="diskcache-")
         directory = str(directory)
         directory = op.expanduser(directory)
         directory = op.expandvars(directory)
 
-        default_size_limit = DEFAULT_SETTINGS['size_limit']
-        size_limit = settings.pop('size_limit', default_size_limit) / shards
+        default_size_limit = DEFAULT_SETTINGS["size_limit"]
+        size_limit = settings.pop("size_limit", default_size_limit) / shards
 
         self._count = shards
         self._directory = directory
         self._disk = disk
         self._shards = tuple(
             Cache(
-                directory=op.join(directory, '%03d' % num),
+                directory=op.join(directory, "%03d" % num),
                 timeout=timeout,
                 disk=disk,
                 size_limit=size_limit,
@@ -61,9 +59,9 @@ class FanoutCache:
         return self._directory
 
     def __getattr__(self, name):
-        safe_names = {'timeout', 'disk'}
+        safe_names = {"timeout", "disk"}
         valid_name = name in DEFAULT_SETTINGS or name in safe_names
-        assert valid_name, 'cannot access {} in cache shard'.format(name)
+        assert valid_name, "cannot access {} in cache shard".format(name)
         return getattr(self._shards[0], name)
 
     @cl.contextmanager
@@ -92,14 +90,14 @@ class FanoutCache:
         :return: context manager for use in `with` statement
 
         """
-        assert retry, 'retry must be True in FanoutCache'
+        assert retry, "retry must be True in FanoutCache"
         with cl.ExitStack() as stack:
             for shard in self._shards:
                 shard_transaction = shard.transact(retry=True)
                 stack.enter_context(shard_transaction)
             yield
 
-    def set(self, key, value, expire=None, read=False, tag=None, retry=False):
+    def set(self, key, value, expire=None, tag=None, retry=False):
         """Set `key` and `value` item in cache.
 
         When `read` is `True`, `value` should be a file-like object opened
@@ -121,7 +119,7 @@ class FanoutCache:
         index = self._hash(key) % self._count
         shard = self._shards[index]
         try:
-            return shard.set(key, value, expire, read, tag, retry)
+            return shard.set(key, value, expire, tag, retry)
         except Timeout:
             return False
 
@@ -300,19 +298,6 @@ class FanoutCache:
         shard = self._shards[index]
         return shard[key]
 
-    def read(self, key):
-        """Return file handle corresponding to `key` from cache.
-
-        :param key: key for item
-        :return: file open for reading in binary mode
-        :raises KeyError: if key is not found
-
-        """
-        handle = self.get(key, default=ENOVAL, read=True, retry=True)
-        if handle is ENOVAL:
-            raise KeyError(key)
-        return handle
-
     def __contains__(self, key):
         """Return `True` if `key` matching item is found in cache.
 
@@ -324,9 +309,7 @@ class FanoutCache:
         shard = self._shards[index]
         return key in shard
 
-    def pop(
-        self, key, default=None, expire_time=False, tag=False, retry=False
-    ):  # noqa: E501
+    def pop(self, key, default=None, expire_time=False, tag=False, retry=False):  # noqa: E501
         """Remove corresponding item for `key` from cache and return value.
 
         If `key` is missing, return `default`.
@@ -418,7 +401,7 @@ class FanoutCache:
         :return: count of items removed
 
         """
-        return self._remove('expire', args=(time.time(),), retry=retry)
+        return self._remove("expire", args=(time.time(),), retry=retry)
 
     def create_tag_index(self):
         """Create tag index on cache database.
@@ -451,7 +434,7 @@ class FanoutCache:
         :return: count of items removed
 
         """
-        return self._remove('evict', args=(tag,), retry=retry)
+        return self._remove("evict", args=(tag,), retry=retry)
 
     def cull(self, retry=False):
         """Cull items from cache until volume is less than size limit.
@@ -463,7 +446,7 @@ class FanoutCache:
         :return: count of items removed
 
         """
-        return self._remove('cull', retry=retry)
+        return self._remove("cull", retry=retry)
 
     def clear(self, retry=False):
         """Remove all items from cache.
@@ -475,7 +458,7 @@ class FanoutCache:
         :return: count of items removed
 
         """
-        return self._remove('clear', retry=retry)
+        return self._remove("clear", retry=retry)
 
     def _remove(self, name, args=(), retry=False):
         total = 0
@@ -602,8 +585,8 @@ class FanoutCache:
         try:
             return _caches[name]
         except KeyError:
-            parts = name.split('/')
-            directory = op.join(self._directory, 'cache', *parts)
+            parts = name.split("/")
+            directory = op.join(self._directory, "cache", *parts)
             temp = Cache(
                 directory=directory,
                 timeout=timeout,
@@ -636,12 +619,12 @@ class FanoutCache:
         try:
             return _deques[name]
         except KeyError:
-            parts = name.split('/')
-            directory = op.join(self._directory, 'deque', *parts)
+            parts = name.split("/")
+            directory = op.join(self._directory, "deque", *parts)
             cache = Cache(
                 directory=directory,
                 disk=self._disk,
-                eviction_policy='none',
+                eviction_policy="none",
             )
             deque = Deque.fromcache(cache, maxlen=maxlen)
             _deques[name] = deque
@@ -672,12 +655,12 @@ class FanoutCache:
         try:
             return _indexes[name]
         except KeyError:
-            parts = name.split('/')
-            directory = op.join(self._directory, 'index', *parts)
+            parts = name.split("/")
+            directory = op.join(self._directory, "index", *parts)
             cache = Cache(
                 directory=directory,
                 disk=self._disk,
-                eviction_policy='none',
+                eviction_policy="none",
             )
             index = Index.fromcache(cache)
             _indexes[name] = index

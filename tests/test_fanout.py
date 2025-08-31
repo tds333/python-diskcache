@@ -19,8 +19,8 @@ import pytest
 
 import diskcache as dc
 
-warnings.simplefilter('error')
-warnings.simplefilter('ignore', category=dc.EmptyDirWarning)
+warnings.simplefilter("error")
+warnings.simplefilter("ignore", category=dc.EmptyDirWarning)
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def cache():
 
 def test_init(cache):
     default_settings = dc.DEFAULT_SETTINGS.copy()
-    del default_settings['size_limit']
+    del default_settings["size_limit"]
     for key, value in default_settings.items():
         assert getattr(cache, key) == value
     assert cache.size_limit == 2**27
@@ -99,7 +99,7 @@ def test_set_timeout(cache):
     shard.set = set_func
     set_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert not cache.set(0, 0)
 
 
@@ -119,7 +119,7 @@ def test_touch_timeout(cache):
     shard.touch = touch_func
     touch_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert not cache.touch(0)
 
 
@@ -138,7 +138,7 @@ def test_add_timeout(cache):
     shard.add = add_func
     add_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert not cache.add(0, 0)
 
 
@@ -174,7 +174,7 @@ def test_add_concurrent():
 
 
 def test_incr(cache):
-    cache.incr('key', delta=3) == 3
+    cache.incr("key", delta=3) == 3
 
 
 def test_incr_timeout(cache):
@@ -186,12 +186,12 @@ def test_incr_timeout(cache):
     shard.incr = incr_func
     incr_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
-        assert cache.incr('key', 1) is None
+    with mock.patch.object(cache, "_shards", shards):
+        assert cache.incr("key", 1) is None
 
 
 def test_decr(cache):
-    cache.decr('key', delta=2) == -2
+    cache.decr("key", delta=2) == -2
 
 
 def test_decr_timeout(cache):
@@ -203,13 +203,13 @@ def test_decr_timeout(cache):
     shard.decr = decr_func
     decr_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
-        assert cache.decr('key', 1) is None
+    with mock.patch.object(cache, "_shards", shards):
+        assert cache.decr("key", 1) is None
 
 
 def stress_incr(cache, limit):
     for _ in range(limit):
-        cache.incr(b'key', retry=True)
+        cache.incr(b"key", retry=True)
         time.sleep(0.001)
 
 
@@ -229,7 +229,7 @@ def test_incr_concurrent():
         for thread in threads:
             thread.join()
 
-        assert cache.get(b'key') == count * limit
+        assert cache.get(b"key") == count * limit
         cache.check()
     shutil.rmtree(cache.directory, ignore_errors=True)
 
@@ -241,23 +241,19 @@ def test_getsetdel(cache):
         (1234, False),
         (2**512, False),
         (56.78, False),
-        ('hello', False),
-        ('hello' * 2**10, False),
-        (b'world', False),
-        (b'world' * 2**10, False),
-        (io.BytesIO(b'world' * 2**10), True),
+        ("hello", False),
+        ("hello" * 2**10, False),
+        (b"world", False),
+        (b"world" * 2**10, False),
     ]
 
     for key, (value, file_like) in enumerate(values):
-        assert cache.set(key, value, read=file_like)
+        assert cache.set(key, value)
 
     assert len(cache) == len(values)
 
     for key, (value, file_like) in enumerate(values):
-        if file_like:
-            assert cache[key] == value.getvalue()
-        else:
-            assert cache[key] == value
+        assert cache[key] == value
 
     for key, _ in enumerate(values):
         del cache[key]
@@ -291,7 +287,7 @@ def test_get_timeout(cache):
     shard.get = get_func
     get_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert cache.get(0) is None
 
 
@@ -312,7 +308,7 @@ def test_pop_timeout(cache):
     shard.pop = pop_func
     pop_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert cache.pop(0) is None
 
 
@@ -325,7 +321,7 @@ def test_delete_timeout(cache):
     shard.delete = delete_func
     delete_func.side_effect = dc.Timeout
 
-    with mock.patch.object(cache, '_shards', shards):
+    with mock.patch.object(cache, "_shards", shards):
         assert not cache.delete(0)
 
 
@@ -348,25 +344,13 @@ def test_tag_index(cache):
     assert cache.tag_index == 0
 
 
-def test_read(cache):
-    cache.set(0, b'abcd' * 2**20)
-    with cache.read(0) as reader:
-        assert reader is not None
-
-
-def test_read_keyerror(cache):
-    with pytest.raises(KeyError):
-        with cache.read(0):
-            pass
-
-
 def test_getitem_keyerror(cache):
     with pytest.raises(KeyError):
         cache[0]
 
 
 def test_expire(cache):
-    cache.reset('cull_limit', 0)
+    cache.reset("cull_limit", 0)
 
     for value in range(100):
         cache.set(value, value, expire=1e-9)
@@ -374,29 +358,29 @@ def test_expire(cache):
     assert len(cache) == 100
 
     time.sleep(0.01)
-    cache.reset('cull_limit', 10)
+    cache.reset("cull_limit", 10)
 
     assert cache.expire() == 100
 
 
 def test_evict(cache):
-    colors = ('red', 'blue', 'yellow')
+    colors = ("red", "blue", "yellow")
 
     for value in range(90):
         assert cache.set(value, value, tag=colors[value % len(colors)])
 
     assert len(cache) == 90
-    assert cache.evict('red') == 30
+    assert cache.evict("red") == 30
     assert len(cache) == 60
     assert len(cache.check()) == 0
 
 
 def test_size_limit_with_files(cache):
     shards = 8
-    cache.reset('cull_limit', 0)
+    cache.reset("cull_limit", 0)
     size_limit = 30 * cache.disk_min_file_size
-    cache.reset('size_limit', size_limit)
-    value = b'foo' * cache.disk_min_file_size
+    cache.reset("size_limit", size_limit)
+    value = b"foo" * cache.disk_min_file_size
 
     for key in range(40 * shards):
         cache.set(key, value)
@@ -408,10 +392,10 @@ def test_size_limit_with_files(cache):
 
 def test_size_limit_with_database(cache):
     shards = 8
-    cache.reset('cull_limit', 0)
+    cache.reset("cull_limit", 0)
     size_limit = 2 * cache.disk_min_file_size
-    cache.reset('size_limit', size_limit)
-    value = b'0123456789' * 10
+    cache.reset("size_limit", size_limit)
+    value = b"0123456789" * 10
     count = size_limit // (8 + len(value)) * shards
 
     for key in range(count):
@@ -438,7 +422,7 @@ def test_remove_timeout(cache):
     shard.clear = clear
     clear.side_effect = [dc.Timeout(2), 3]
 
-    with mock.patch.object(cache, '_shards', [shard]):
+    with mock.patch.object(cache, "_shards", [shard]):
         assert cache.clear() == 5
 
 
@@ -449,8 +433,8 @@ def test_reset_timeout(cache):
     shard.reset = reset
     reset.side_effect = [dc.Timeout, 0]
 
-    with mock.patch.object(cache, '_shards', [shard]):
-        assert cache.reset('blah', 1) == 0
+    with mock.patch.object(cache, "_shards", [shard]):
+        assert cache.reset("blah", 1) == 0
 
 
 def test_stats(cache):
@@ -495,7 +479,7 @@ def test_iter_expire(cache):
     Iteration does not expire keys.
 
     """
-    cache.reset('cull_limit', 0)
+    cache.reset("cull_limit", 0)
     for num in range(100):
         cache.set(num, num, expire=1e-9)
     time.sleep(0.1)
@@ -512,7 +496,7 @@ def test_reversed(cache):
 
 
 def test_pickle(cache):
-    for num, val in enumerate('abcde'):
+    for num, val in enumerate("abcde"):
         cache[val] = num
 
     data = pickle.dumps(cache)
@@ -533,7 +517,7 @@ def test_memoize(cache):
 
         return alpha
 
-    @cache.memoize(name='fib')
+    @cache.memoize(name="fib")
     def fibrec(num):
         if num == 0:
             return 0
@@ -584,7 +568,7 @@ def test_copy():
 
 
 def run(command):
-    print('run$ %r' % command)
+    print("run$ %r" % command)
     try:
         result = sp.check_output(command, stderr=sp.STDOUT)
         print(result)
@@ -595,11 +579,11 @@ def run(command):
 
 def test_rsync():
     try:
-        run(['rsync', '--version'])
+        run(["rsync", "--version"])
     except OSError:
         return  # No rsync installed. Skip test.
 
-    rsync_args = ['rsync', '-a', '--checksum', '--delete', '--stats']
+    rsync_args = ["rsync", "-a", "--checksum", "--delete", "--stats"]
     cache_dir1 = tempfile.mkdtemp() + os.sep
     cache_dir2 = tempfile.mkdtemp() + os.sep
 
@@ -655,31 +639,3 @@ def test_rsync():
 
     shutil.rmtree(cache_dir1, ignore_errors=True)
     shutil.rmtree(cache_dir2, ignore_errors=True)
-
-
-class SHA256FilenameDisk(dc.Disk):
-    def filename(self, key=dc.UNKNOWN, value=dc.UNKNOWN):
-        filename = hashlib.sha256(key).hexdigest()[:32]
-        full_path = op.join(self._directory, filename)
-        return filename, full_path
-
-
-def test_custom_filename_disk():
-    with dc.FanoutCache(disk=SHA256FilenameDisk) as cache:
-        for count in range(100, 200):
-            key = str(count).encode('ascii')
-            cache[key] = str(count) * int(1e5)
-
-    disk = SHA256FilenameDisk(cache.directory)
-
-    for count in range(100, 200):
-        key = str(count).encode('ascii')
-        subdir = '%03d' % (disk.hash(key) % 8)
-        filename = hashlib.sha256(key).hexdigest()[:32]
-        full_path = op.join(cache.directory, subdir, filename)
-
-        with open(full_path) as reader:
-            content = reader.read()
-            assert content == str(count) * int(1e5)
-
-    shutil.rmtree(cache.directory, ignore_errors=True)
