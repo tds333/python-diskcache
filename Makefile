@@ -1,5 +1,6 @@
 .DEFAULT_GOAL := help
 SOURCE_DIR = ./diskcache
+PY_VERSIONS = 3.7 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.13t 3.14t pypy@3.9 pypy@3.10 pypy@3.11
 export UV_MANAGED_PYTHON ?= 1
 
 ##@ CI/CD
@@ -9,7 +10,7 @@ build: ## Build
 
 .PHONY: cov
 cov: ## Run tests with coverage
-	uv run pytest --cov-report=term-missing --cov-config=pyproject.toml --cov=src/plainlog
+	uv run pytest -n auto --cov-report=term-missing --cov-config=pyproject.toml --cov=diskcache
 
 ##@ Quality
 .PHONY: test
@@ -29,20 +30,26 @@ test-orig: ## Run tests in current Python
     --ignore docs/sf-python-2017-meetup-talk.rst\
     --ignore tests/issue_85.py
 
+# .PHONY: tests
+# tests: ## Run tests in all supporte Python versions
+# 	uv run --isolated -p 3.9 pytest -n auto
+# 	uv run --isolated -p 3.10 pytest -n auto
+# 	uv run --isolated -p 3.11 pytest -n auto
+# 	uv run --isolated -p 3.12 pytest -n auto
+# 	uv run --isolated -p 3.13 pytest -n auto
+# 	uv run --isolated -p 3.14 pytest -n auto
+# 	uv run --isolated -p 3.13t pytest -n auto
+# 	uv run --isolated -p 3.14t pytest -n auto
+# 	uv run --isolated -p pypy@3.9 pytest -n auto
+# 	uv run --isolated -p pypy@3.10 pytest -n auto
+# 	uv run --isolated -p pypy@3.11 pytest -n auto
+# #	uv run --isolated -p graalpy pytest
+
 .PHONY: tests
 tests: ## Run tests in all supporte Python versions
-	uv run --isolated -p 3.9 pytest -n auto
-	uv run --isolated -p 3.10 pytest -n auto
-	uv run --isolated -p 3.11 pytest -n auto
-	uv run --isolated -p 3.12 pytest -n auto
-	uv run --isolated -p 3.13 pytest -n auto
-	uv run --isolated -p 3.14 pytest -n auto
-	uv run --isolated -p 3.13t pytest -n auto
-	uv run --isolated -p 3.14t pytest -n auto
-	uv run --isolated -p pypy@3.9 pytest -n auto
-	uv run --isolated -p pypy@3.10 pytest -n auto
-	uv run --isolated -p pypy@3.11 pytest -n auto
-#	uv run --isolated -p graalpy pytest
+	for py_v in $(PY_VERSIONS); do \
+		uv run --isolated -p $$py_v pytest -n auto; \
+	done
 
 .PHONY: check
 check: ## Run all checks 

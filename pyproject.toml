@@ -19,11 +19,14 @@ classifiers = [
   'Natural Language :: English',
   'Programming Language :: Python',
   'Programming Language :: Python :: 3',
-  'Programming Language :: Python :: 3.5',
-  'Programming Language :: Python :: 3.6',
   'Programming Language :: Python :: 3.7',
   'Programming Language :: Python :: 3.8',
   'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: 3.10',
+  'Programming Language :: Python :: 3.11',
+  'Programming Language :: Python :: 3.12',
+  'Programming Language :: Python :: 3.13',
+  'Programming Language :: Python :: 3.14',
   'Programming Language :: Python :: Implementation :: CPython',
 ]
 dependencies = []
@@ -43,8 +46,8 @@ parallel = true
 branch = true
 source = ["diskcache"]
 
-[tool.coverage.paths]
-source = ["."]
+# [tool.coverage.paths]
+# source = ["."]
 
 [tool.coverage.report]
 show_missing = true
@@ -76,8 +79,6 @@ ignore = [
 ]
 
 [dependency-groups]
-#dev = ["pytest", "pytest-cov"]
-#show-source = true
 dev = [
   #"ruff",
   #"coverage",
