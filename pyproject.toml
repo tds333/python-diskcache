@@ -1,0 +1,104 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "diskcache"
+description = 'Disk Cache -- Disk and file backed persistent cache.'
+readme = "README.rst"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+#license-files = ["LICENSES/*"]
+keywords = []
+
+authors = [{ name = "Grant Jenks", email = "contact@grantjenks.com" }]
+classifiers = [
+  'Development Status :: 5 - Production/Stable',
+  'Intended Audience :: Developers',
+  'License :: OSI Approved :: Apache Software License',
+  'Natural Language :: English',
+  'Programming Language :: Python',
+  'Programming Language :: Python :: 3',
+  'Programming Language :: Python :: 3.5',
+  'Programming Language :: Python :: 3.6',
+  'Programming Language :: Python :: 3.7',
+  'Programming Language :: Python :: 3.8',
+  'Programming Language :: Python :: 3.9',
+  'Programming Language :: Python :: Implementation :: CPython',
+]
+dependencies = []
+dynamic = ["version"]
+
+[project.urls]
+Documentation = 'http://www.grantjenks.com/docs/diskcache/'
+Funding = 'https://gum.co/diskcache'
+Source = 'https://github.com/grantjenks/python-diskcache'
+Tracker = 'https://github.com/grantjenks/python-diskcache/issues'
+
+[tool.hatch.version]
+path = "diskcache/__init__.py"
+
+[tool.coverage.run]
+parallel = true
+branch = true
+source = ["diskcache"]
+
+[tool.coverage.paths]
+source = ["."]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
+omit = ["diskcache/__version__.py"]
+
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+exclude = [".env", ".venv", "venv"]
+line-length = 88
+[tool.ruff.lint]
+select = [
+  "E", # pycodestyle errors
+  "W", # pycodestyle warnings
+  "F", # pyflakes
+  "I", # isort
+  "C", # flake8-comprehensions
+  "B", # flake8-bugbear
+]
+ignore = [
+  "E501", # line too long, handled by black
+  "B008", # do not perform function calls in argument defaults
+  "C901", # too complex
+]
+
+[dependency-groups]
+#dev = ["pytest", "pytest-cov"]
+#show-source = true
+dev = [
+  "blue",
+  "coverage",
+  "django==4.2.*",
+  "django_redis",
+  "doc8",
+  "flake8",
+  "ipython",
+  "jedi",
+  "pickleDB",
+  # "pylibmc",
+  "pylint",
+  "pytest",
+  "pytest-cov",
+  "pytest-django",
+  "pytest-env",
+  "pytest-xdist",
+  "rstcheck",
+  "sphinx",
+  "sqlitedict",
+  "tox",
+  "twine",
+  "wheel",
+]
