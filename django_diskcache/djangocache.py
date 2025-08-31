@@ -10,8 +10,8 @@ except ImportError:  # pragma: no cover
     # For older versions of Django simply use 300 seconds.
     DEFAULT_TIMEOUT = 300
 
-from .core import ENOVAL, args_to_key, full_name
-from .fanout import FanoutCache
+from diskcache.core import ENOVAL, args_to_key, full_name
+from diskcache.fanout import FanoutCache
 
 
 class DjangoCache(BaseCache):
@@ -25,9 +25,9 @@ class DjangoCache(BaseCache):
 
         """
         super().__init__(params)
-        shards = params.get('SHARDS', 8)
-        timeout = params.get('DATABASE_TIMEOUT', 0.010)
-        options = params.get('OPTIONS', {})
+        shards = params.get("SHARDS", 8)
+        timeout = params.get("DATABASE_TIMEOUT", 0.010)
+        options = params.get("OPTIONS", {})
         self._cache = FanoutCache(directory, shards, timeout, **options)
 
     @property
@@ -415,7 +415,7 @@ class DjangoCache(BaseCache):
         """
         # Caution: Nearly identical code exists in Cache.memoize
         if callable(name):
-            raise TypeError('name cannot be callable')
+            raise TypeError("name cannot be callable")
 
         def decorator(func):
             """Decorator created by memoize() for callable `func`."""
@@ -430,9 +430,7 @@ class DjangoCache(BaseCache):
                 if result is ENOVAL:
                     result = func(*args, **kwargs)
                     valid_timeout = (
-                        timeout is None
-                        or timeout == DEFAULT_TIMEOUT
-                        or timeout > 0
+                        timeout is None or timeout == DEFAULT_TIMEOUT or timeout > 0
                     )
                     if valid_timeout:
                         self.set(

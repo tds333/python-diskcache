@@ -13,7 +13,7 @@ import warnings
 
 from diskcache import Cache, EmptyDirWarning, Timeout, UnknownFileWarning
 
-from .utils import display
+from utils import display
 
 OPERATIONS = int(1e4)
 GET_AVERAGE = 100

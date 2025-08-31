@@ -8,7 +8,7 @@ description = 'Disk Cache -- Disk and file backed persistent cache.'
 readme = "README.rst"
 requires-python = ">=3.9"
 license = "Apache-2.0"
-#license-files = ["LICENSES/*"]
+license-files = ["LICENSE"]
 keywords = []
 
 authors = [{ name = "Grant Jenks", email = "contact@grantjenks.com" }]
@@ -54,7 +54,7 @@ omit = ["diskcache/__version__.py"]
 
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+#pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -79,26 +79,22 @@ ignore = [
 #dev = ["pytest", "pytest-cov"]
 #show-source = true
 dev = [
-  "blue",
-  "coverage",
-  "django==4.2.*",
-  "django_redis",
-  "doc8",
-  "flake8",
-  "ipython",
-  "jedi",
-  "pickleDB",
-  # "pylibmc",
-  "pylint",
+  #"ruff",
+  #"coverage",
+  #"django==4.2.*",
+  #"doc8",
+  #"jedi",
+  #"pylint",
   "pytest",
   "pytest-cov",
-  "pytest-django",
+  #"pytest-django",
   "pytest-env",
   "pytest-xdist",
-  "rstcheck",
-  "sphinx",
-  "sqlitedict",
-  "tox",
-  "twine",
-  "wheel",
+  #"rstcheck",
+  #"sphinx",
+  #"tox",
+  #"twine",
+  #"wheel",
 ]
+
+benchmark = ["ipython<9", "pickleDB<1", "pylibmc", "sqlitedict", "django_redis"]

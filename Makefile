@@ -14,21 +14,34 @@ cov: ## Run tests with coverage
 ##@ Quality
 .PHONY: test
 test: ## Run tests in current Python
-	uv run pytest
+	uv run pytest -n auto
+
+.PHONY: test-orig
+test-orig: ## Run tests in current Python
+	uv run pytest\
+    -n auto\
+    --cov-branch\
+    --cov-fail-under=98\
+    --cov-report=term-missing\
+    --cov=diskcache\
+    --doctest-glob="*.rst"\
+    --ignore docs/case-study-web-crawler.rst\
+    --ignore docs/sf-python-2017-meetup-talk.rst\
+    --ignore tests/issue_85.py
 
 .PHONY: tests
 tests: ## Run tests in all supporte Python versions
-	uv run --isolated -p 3.9 pytest
-	uv run --isolated -p 3.10 pytest
-	uv run --isolated -p 3.11 pytest
-	uv run --isolated -p 3.12 pytest
-	uv run --isolated -p 3.13 pytest
-	uv run --isolated -p 3.14 pytest
-	uv run --isolated -p 3.13t pytest
-	uv run --isolated -p 3.14t pytest
-	uv run --isolated -p pypy@3.9 pytest
-	uv run --isolated -p pypy@3.10 pytest
-	uv run --isolated -p pypy@3.11 pytest
+	uv run --isolated -p 3.9 pytest -n auto
+	uv run --isolated -p 3.10 pytest -n auto
+	uv run --isolated -p 3.11 pytest -n auto
+	uv run --isolated -p 3.12 pytest -n auto
+	uv run --isolated -p 3.13 pytest -n auto
+	uv run --isolated -p 3.14 pytest -n auto
+	uv run --isolated -p 3.13t pytest -n auto
+	uv run --isolated -p 3.14t pytest -n auto
+	uv run --isolated -p pypy@3.9 pytest -n auto
+	uv run --isolated -p pypy@3.10 pytest -n auto
+	uv run --isolated -p pypy@3.11 pytest -n auto
 #	uv run --isolated -p graalpy pytest
 
 .PHONY: check
@@ -51,8 +64,16 @@ format: ## Format files using ruff format
 	uvx ruff format ${SOURCE_DIR}
 
 .PHONY: bench
-bench: ## Format files using ruff format
-	uv run benchmarks/timeit_bench_log.py
+bench: ## run benchmarks
+	uv run --isolated --group benchmark benchmarks/benchmark_core.py
+
+.PHONY: bench-kv
+bench-kv: ## run benchmarks kv
+	uv run --isolated --group benchmark python -m IPython benchmarks/benchmark_kv_store.py
+
+.PHONY: docs
+docs: ## build docs
+	cd docs && $(MAKE) html
 
 ##@ Utility
 .PHONY: clean
