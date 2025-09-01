@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 SOURCE_DIR = ./diskcache
-PY_VERSIONS = 3.7 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.13t 3.14t pypy@3.9 pypy@3.10 pypy@3.11
+PY_VERSIONS = 3.8 3.9 3.10 3.11 3.12 3.13 3.14 3.13t 3.14t pypy@3.9 pypy@3.10 pypy@3.11
 export UV_MANAGED_PYTHON ?= 1
 
 ##@ CI/CD

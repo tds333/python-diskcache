@@ -58,6 +58,13 @@ class FanoutCache:
         """Cache directory."""
         return self._directory
 
+    def _get_shard(self, key):
+        if self._count == 1:
+            return self._shards[0]
+
+        index = self._hash(key) % self._count
+        return self._shards[index]
+
     def __getattr__(self, name):
         safe_names = {"timeout", "disk"}
         valid_name = name in DEFAULT_SETTINGS or name in safe_names
@@ -100,8 +107,6 @@ class FanoutCache:
     def set(self, key, value, expire=None, tag=None, retry=False):
         """Set `key` and `value` item in cache.
 
-        When `read` is `True`, `value` should be a file-like object opened
-        for reading in binary mode.
 
         If database timeout occurs then fails silently unless `retry` is set to
         `True` (default `False`).
@@ -110,14 +115,12 @@ class FanoutCache:
         :param value: value for item
         :param float expire: seconds until the key expires
             (default None, no expiry)
-        :param bool read: read value as raw bytes from file (default False)
         :param str tag: text to associate with key (default None)
         :param bool retry: retry if database timeout occurs (default False)
         :return: True if item was set
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.set(key, value, expire, tag, retry)
         except Timeout:
@@ -132,8 +135,7 @@ class FanoutCache:
         :param value: value for item
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         shard[key] = value
 
     def touch(self, key, expire=None, retry=False):
@@ -149,14 +151,13 @@ class FanoutCache:
         :return: True if key was touched
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.touch(key, expire, retry)
         except Timeout:
             return False
 
-    def add(self, key, value, expire=None, read=False, tag=None, retry=False):
+    def add(self, key, value, expire=None, tag=None, retry=False):
         """Add `key` and `value` item to cache.
 
         Similar to `set`, but only add to cache if key not present.
@@ -164,8 +165,6 @@ class FanoutCache:
         This operation is atomic. Only one concurrent add operation for given
         key from separate threads or processes will succeed.
 
-        When `read` is `True`, `value` should be a file-like object opened
-        for reading in binary mode.
 
         If database timeout occurs then fails silently unless `retry` is set to
         `True` (default `False`).
@@ -174,16 +173,14 @@ class FanoutCache:
         :param value: value for item
         :param float expire: seconds until the key expires
             (default None, no expiry)
-        :param bool read: read value as bytes from file (default False)
         :param str tag: text to associate with key (default None)
         :param bool retry: retry if database timeout occurs (default False)
         :return: True if item was added
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
-            return shard.add(key, value, expire, read, tag, retry)
+            return shard.add(key, value, expire, tag, retry)
         except Timeout:
             return False
 
@@ -211,8 +208,7 @@ class FanoutCache:
         :raises KeyError: if key is not found and default is None
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.incr(key, delta, default, retry)
         except Timeout:
@@ -245,8 +241,7 @@ class FanoutCache:
         :raises KeyError: if key is not found and default is None
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.decr(key, delta, default, retry)
         except Timeout:
@@ -256,7 +251,6 @@ class FanoutCache:
         self,
         key,
         default=None,
-        read=False,
         expire_time=False,
         tag=False,
         retry=False,
@@ -268,8 +262,6 @@ class FanoutCache:
 
         :param key: key for item
         :param default: return value if key is missing (default None)
-        :param bool read: if True, return file handle to value
-            (default False)
         :param float expire_time: if True, return expire_time in tuple
             (default False)
         :param tag: if True, return tag in tuple (default False)
@@ -277,10 +269,9 @@ class FanoutCache:
         :return: value for item if key is found else default
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
-            return shard.get(key, default, read, expire_time, tag, retry)
+            return shard.get(key, default, expire_time, tag, retry)
         except (Timeout, sqlite3.OperationalError):
             return default
 
@@ -294,8 +285,7 @@ class FanoutCache:
         :raises KeyError: if key is not found
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         return shard[key]
 
     def __contains__(self, key):
@@ -305,8 +295,7 @@ class FanoutCache:
         :return: True if key is found
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         return key in shard
 
     def pop(self, key, default=None, expire_time=False, tag=False, retry=False):  # noqa: E501
@@ -328,8 +317,7 @@ class FanoutCache:
         :return: value for item if key is found else default
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.pop(key, default, expire_time, tag, retry)
         except Timeout:
@@ -348,8 +336,7 @@ class FanoutCache:
         :return: True if item was deleted
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         try:
             return shard.delete(key, retry)
         except Timeout:
@@ -364,8 +351,7 @@ class FanoutCache:
         :raises KeyError: if key is not found
 
         """
-        index = self._hash(key) % self._count
-        shard = self._shards[index]
+        shard = self._get_shard(key)
         del shard[key]
 
     def check(self, fix=False, retry=False):
