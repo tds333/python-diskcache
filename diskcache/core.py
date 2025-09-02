@@ -95,14 +95,13 @@ EVICTION_POLICY = {
 class Disk:
     """Cache key and value serialization for SQLite database and files."""
 
-    def __init__(self, directory, pickle_protocol=0):
+    def __init__(self, pickle_protocol=0):
         """Initialize disk instance.
 
         :param str directory: directory path
         :param int pickle_protocol: pickle protocol for serialization
 
         """
-        self._directory = directory
         self.pickle_protocol = pickle_protocol
 
     def hash(self, key):
@@ -210,7 +209,7 @@ class Disk:
 class JSONDisk(Disk):
     """Cache key and value using JSON serialization with zlib compression."""
 
-    def __init__(self, directory, compress_level=1, **kwargs):
+    def __init__(self, compress_level=1, **kwargs):
         """Initialize JSON disk instance.
 
         Keys and values are compressed using the zlib library. The
@@ -224,7 +223,7 @@ class JSONDisk(Disk):
 
         """
         self.compress_level = compress_level
-        super().__init__(directory, **kwargs)
+        super().__init__(**kwargs)
 
     def put(self, key):
         json_bytes = json.dumps(key).encode("utf-8")
@@ -356,7 +355,7 @@ class Cache:
         kwargs = {
             key[5:]: value for key, value in sets.items() if key.startswith("disk_")
         }
-        self._disk = disk(directory, **kwargs)
+        self._disk = disk(**kwargs)
 
         # Set cached attributes: updates settings and sets pragmas.
 
