@@ -18,7 +18,7 @@ from .core import (
     UnknownFileWarning,
 )
 from .fanout import FanoutCache
-from .persistent import Deque, Index
+from .persistent import Index
 from .recipes import (
     Averager,
     BoundedSemaphore,
@@ -34,7 +34,6 @@ __all__ = [
     "BoundedSemaphore",
     "Cache",
     "DEFAULT_SETTINGS",
-    "Deque",
     "Disk",
     "ENOVAL",
     "EVICTION_POLICY",
@@ -52,13 +51,6 @@ __all__ = [
     "throttle",
 ]
 
-try:
-    from .djangocache import DjangoCache  # noqa
-
-    __all__.append("DjangoCache")
-except Exception:  # pylint: disable=broad-except  # pragma: no cover
-    # Django not installed or not setup so ignore.
-    pass
 
 __title__ = "diskcache"
 __version__ = "5.6.3"

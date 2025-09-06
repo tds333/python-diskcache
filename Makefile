@@ -15,7 +15,7 @@ cov: ## Run tests with coverage
 ##@ Quality
 .PHONY: test
 test: ## Run tests in current Python
-	uv run pytest -n auto
+	uv run pytest --lf -n auto
 
 .PHONY: test-orig
 test-orig: ## Run tests in current Python

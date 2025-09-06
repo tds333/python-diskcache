@@ -10,7 +10,7 @@ import tempfile
 import time
 
 from .core import DEFAULT_SETTINGS, ENOVAL, Cache, Disk, Timeout
-from .persistent import Deque, Index
+from .persistent import Index
 
 
 class FanoutCache:
@@ -104,7 +104,7 @@ class FanoutCache:
                 stack.enter_context(shard_transaction)
             yield
 
-    def set(self, key, value, expire=None, tag=None, retry=False):
+    def set(self, key, value, expire=None, retry=False):
         """Set `key` and `value` item in cache.
 
 
@@ -115,14 +115,13 @@ class FanoutCache:
         :param value: value for item
         :param float expire: seconds until the key expires
             (default None, no expiry)
-        :param str tag: text to associate with key (default None)
         :param bool retry: retry if database timeout occurs (default False)
         :return: True if item was set
 
         """
         shard = self._get_shard(key)
         try:
-            return shard.set(key, value, expire, tag, retry)
+            return shard.set(key, value, expire, retry)
         except Timeout:
             return False
 
@@ -157,7 +156,7 @@ class FanoutCache:
         except Timeout:
             return False
 
-    def add(self, key, value, expire=None, tag=None, retry=False):
+    def add(self, key, value, expire=None, retry=False):
         """Add `key` and `value` item to cache.
 
         Similar to `set`, but only add to cache if key not present.
@@ -173,14 +172,13 @@ class FanoutCache:
         :param value: value for item
         :param float expire: seconds until the key expires
             (default None, no expiry)
-        :param str tag: text to associate with key (default None)
         :param bool retry: retry if database timeout occurs (default False)
         :return: True if item was added
 
         """
         shard = self._get_shard(key)
         try:
-            return shard.add(key, value, expire, tag, retry)
+            return shard.add(key, value, expire, retry)
         except Timeout:
             return False
 
@@ -252,7 +250,6 @@ class FanoutCache:
         key,
         default=None,
         expire_time=False,
-        tag=False,
         retry=False,
     ):
         """Retrieve value from cache. If `key` is missing, return `default`.
@@ -264,14 +261,13 @@ class FanoutCache:
         :param default: return value if key is missing (default None)
         :param float expire_time: if True, return expire_time in tuple
             (default False)
-        :param tag: if True, return tag in tuple (default False)
         :param bool retry: retry if database timeout occurs (default False)
         :return: value for item if key is found else default
 
         """
         shard = self._get_shard(key)
         try:
-            return shard.get(key, default, expire_time, tag, retry)
+            return shard.get(key, default, expire_time, retry)
         except (Timeout, sqlite3.OperationalError):
             return default
 
@@ -298,7 +294,7 @@ class FanoutCache:
         shard = self._get_shard(key)
         return key in shard
 
-    def pop(self, key, default=None, expire_time=False, tag=False, retry=False):  # noqa: E501
+    def pop(self, key, default=None, expire_time=False, retry=False):  # noqa: E501
         """Remove corresponding item for `key` from cache and return value.
 
         If `key` is missing, return `default`.
@@ -312,14 +308,13 @@ class FanoutCache:
         :param default: return value if key is missing (default None)
         :param float expire_time: if True, return expire_time in tuple
             (default False)
-        :param tag: if True, return tag in tuple (default False)
         :param bool retry: retry if database timeout occurs (default False)
         :return: value for item if key is found else default
 
         """
         shard = self._get_shard(key)
         try:
-            return shard.pop(key, default, expire_time, tag, retry)
+            return shard.pop(key, default, expire_time, retry)
         except Timeout:
             return default
 
@@ -389,38 +384,17 @@ class FanoutCache:
         """
         return self._remove("expire", args=(time.time(),), retry=retry)
 
-    def create_tag_index(self):
-        """Create tag index on cache database.
-
-        Better to initialize cache with `tag_index=True` than use this.
-
-        :raises Timeout: if database timeout occurs
-
-        """
-        for shard in self._shards:
-            shard.create_tag_index()
-
-    def drop_tag_index(self):
-        """Drop tag index on cache database.
-
-        :raises Timeout: if database timeout occurs
-
-        """
-        for shard in self._shards:
-            shard.drop_tag_index()
-
-    def evict(self, tag, retry=False):
-        """Remove items with matching `tag` from cache.
+    def evict(self, retry=False):
+        """Remove items from cache.
 
         If database timeout occurs then fails silently unless `retry` is set to
         `True` (default `False`).
 
-        :param str tag: tag identifying items
         :param bool retry: retry if database timeout occurs (default False)
         :return: count of items removed
 
         """
-        return self._remove("evict", args=(tag,), retry=retry)
+        return self._remove("evict", retry=retry)
 
     def cull(self, retry=False):
         """Cull items from cache until volume is less than size limit.
@@ -581,40 +555,6 @@ class FanoutCache:
             )
             _caches[name] = temp
             return temp
-
-    def deque(self, name, maxlen=None):
-        """Return Deque with given `name` in subdirectory.
-
-        >>> cache = FanoutCache()
-        >>> deque = cache.deque('test')
-        >>> deque.extend('abc')
-        >>> deque.popleft()
-        'a'
-        >>> deque.pop()
-        'c'
-        >>> len(deque)
-        1
-
-        :param str name: subdirectory name for Deque
-        :param maxlen: max length (default None, no max)
-        :return: Deque with given name
-
-        """
-        _deques = self._deques
-
-        try:
-            return _deques[name]
-        except KeyError:
-            parts = name.split("/")
-            directory = op.join(self._directory, "deque", *parts)
-            cache = Cache(
-                directory=directory,
-                disk=self._disk,
-                eviction_policy="none",
-            )
-            deque = Deque.fromcache(cache, maxlen=maxlen)
-            _deques[name] = deque
-            return deque
 
     def index(self, name):
         """Return Index with given `name` in subdirectory.

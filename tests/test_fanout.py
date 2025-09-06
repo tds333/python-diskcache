@@ -336,14 +336,6 @@ def test_delitem_keyerror(cache):
         del cache[0]
 
 
-def test_tag_index(cache):
-    assert cache.tag_index == 0
-    cache.create_tag_index()
-    assert cache.tag_index == 1
-    cache.drop_tag_index()
-    assert cache.tag_index == 0
-
-
 def test_getitem_keyerror(cache):
     with pytest.raises(KeyError):
         cache[0]
@@ -367,11 +359,11 @@ def test_evict(cache):
     colors = ("red", "blue", "yellow")
 
     for value in range(90):
-        assert cache.set(value, value, tag=colors[value % len(colors)])
+        assert cache.set(value, value)
 
     assert len(cache) == 90
-    assert cache.evict("red") == 30
-    assert len(cache) == 60
+    assert cache.evict() == 90
+    assert len(cache) == 0
     assert len(cache.check()) == 0
 
 
