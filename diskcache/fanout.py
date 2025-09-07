@@ -16,7 +16,7 @@ from .persistent import Index
 class FanoutCache:
     """Cache that shards keys and values."""
 
-    def __init__(self, directory=None, shards=8, timeout=0.010, disk=Disk, **settings):
+    def __init__(self, directory=None, shards=8, timeout=0.010, disk=None, **settings):
         """Initialize cache instance.
 
         :param str directory: cache directory
@@ -37,7 +37,10 @@ class FanoutCache:
 
         self._count = shards
         self._directory = directory
-        self._disk = disk
+        # if disk is None:
+        #     self._disk = Disk()
+        # else:
+        #     self._disk = disk
         self._shards = tuple(
             Cache(
                 directory=op.join(directory, "%03d" % num),
@@ -48,6 +51,7 @@ class FanoutCache:
             )
             for num in range(shards)
         )
+        self._disk = self._shards[0].disk
         self._hash = self._shards[0].disk.hash
         self._caches = {}
         self._deques = {}
@@ -470,7 +474,7 @@ class FanoutCache:
         self.close()
 
     def __getstate__(self):
-        return (self._directory, self._count, self.timeout, type(self.disk))
+        return (self._directory, self._count, self.timeout, self.disk)
 
     def __setstate__(self, state):
         self.__init__(*state)
@@ -550,7 +554,7 @@ class FanoutCache:
             temp = Cache(
                 directory=directory,
                 timeout=timeout,
-                disk=self._disk if disk is None else Disk,
+                disk=self._disk if disk is None else disk,
                 **settings,
             )
             _caches[name] = temp
