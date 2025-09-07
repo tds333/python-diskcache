@@ -39,8 +39,8 @@ UNKNOWN = Constant("UNKNOWN")
 
 MODE_NONE = 0
 MODE_RAW = 1
-# MODE_BINARY = 2
-# MODE_TEXT = 3
+MODE_BINARY = 2
+MODE_TEXT = 3
 MODE_PICKLE = 4
 
 
@@ -106,26 +106,27 @@ class Disk:
             pickle.HIGHEST_PROTOCOL if pickle_protocol is None else pickle_protocol
         )
 
-    def hash(self, key):
-        """Compute portable hash for `key`.
+    # def hash(self, key):
+    #     """Compute portable hash for `key`.
 
-        :param key: key to hash
-        :return: hash value
+    #     :param key: key to hash
+    #     :return: hash value
 
-        """
-        mask = 0xFFFFFFFF
-        disk_key, _ = self.to_table_key(key)
-        type_disk_key = type(disk_key)
+    #     """
+    #     mask = 0xFFFFFFFF
+    #     # disk_key, _ = self.to_table_key(key)
+    #     disk_key = key
+    #     type_disk_key = type(disk_key)
 
-        if type_disk_key is sqlite3.Binary:
-            return zlib.adler32(disk_key) & mask
-        elif type_disk_key is str:
-            return zlib.adler32(disk_key.encode("utf-8")) & mask  # noqa
-        elif type_disk_key is int:
-            return disk_key % mask
-        else:
-            assert type_disk_key is float
-            return zlib.adler32(struct.pack("!d", disk_key)) & mask
+    #     if type_disk_key is sqlite3.Binary:
+    #         return zlib.adler32(disk_key) & mask
+    #     elif type_disk_key is str:
+    #         return zlib.adler32(disk_key.encode("utf-8")) & mask  # noqa
+    #     elif type_disk_key is int:
+    #         return disk_key % mask
+    #     else:
+    #         assert type_disk_key is float
+    #         return zlib.adler32(struct.pack("!d", disk_key)) & mask
 
     def to_table_key(self, key):
         """Convert `key` to fields key and raw for Cache table.
@@ -145,10 +146,10 @@ class Disk:
             or (type_key is float)
         ):
             return key, True
-        else:
-            data = pickle.dumps(key, protocol=self.pickle_protocol)
-            result = pickletools.optimize(data)
-            return sqlite3.Binary(result), False
+        # else:
+        #     data = pickle.dumps(key, protocol=self.pickle_protocol)
+        #     result = pickletools.optimize(data)
+        #     return sqlite3.Binary(result), False
 
     def from_table_key(self, key, raw):
         """Convert fields `key` and `raw` from Cache table to key.
@@ -161,6 +162,7 @@ class Disk:
         # pylint: disable=unidiomatic-typecheck
         # if raw:
         #     return bytes(key) if type(key) is sqlite3.Binary else key
+        # return key
         if raw:
             return key
         else:
@@ -188,7 +190,7 @@ class Disk:
         ):
             return MODE_RAW, value
         elif type_value is bytes:
-            return MODE_RAW, sqlite3.Binary(value)
+            return MODE_BINARY, sqlite3.Binary(value)
         else:
             result = pickle.dumps(value, protocol=self.pickle_protocol)
 
@@ -205,7 +207,9 @@ class Disk:
         """
         # pylint: disable=unidiomatic-typecheck,consider-using-with
         if mode == MODE_RAW:
-            return bytes(value) if type(value) is sqlite3.Binary else value
+            return value
+        elif mode == MODE_BINARY:
+            return bytes(value)  # if type(value) is sqlite3.Binary else value
         elif mode == MODE_PICKLE:
             return pickle.load(io.BytesIO(value))
 
@@ -229,16 +233,16 @@ class JSONDisk(Disk):
         self.compress_level = compress_level
         super().__init__(**kwargs)
 
-    def to_table_key(self, key):
-        json_bytes = json.dumps(key).encode("utf-8")
-        # data = zlib.compress(json_bytes, self.compress_level)
-        data = json_bytes
-        return super().to_table_key(data)
+    # def to_table_key(self, key):
+    #     json_bytes = json.dumps(key).encode("utf-8")
+    #     # data = zlib.compress(json_bytes, self.compress_level)
+    #     data = json_bytes
+    #     return super().to_table_key(data)
 
-    def from_table_key(self, key, raw):
-        data = super().from_table_key(key, raw)
-        # return json.loads(zlib.decompress(data).decode("utf-8"))
-        return json.loads(data.decode("utf-8"))
+    # def from_table_key(self, key, raw):
+    #     data = super().from_table_key(key, raw)
+    #     # return json.loads(zlib.decompress(data).decode("utf-8"))
+    #     return json.loads(data.decode("utf-8"))
 
     def to_table_value(self, value):
         json_bytes = json.dumps(value).encode("utf-8")
@@ -292,6 +296,13 @@ def args_to_key(base, args, kwargs, typed, ignore):
         if kwargs:
             key += tuple(type(value) for _, value in sorted_items)
 
+    key = pickle.dumps(key, protocol=pickle.HIGHEST_PROTOCOL)
+
+    return key
+
+
+def key_as_pickle(key):
+    key = pickle.dumps(key, protocol=pickle.HIGHEST_PROTOCOL)
     return key
 
 
@@ -626,7 +637,8 @@ class Cache:
 
         """
         now = time.time()
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         expire_time = None if expire is None else now + expire
         mode, db_value = self._disk.to_table_value(value)
         columns = (expire_time, mode, db_value)
@@ -811,7 +823,8 @@ class Cache:
 
         """
         now = time.time()
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         expire_time = None if expire is None else now + expire
 
         with self._transact(retry) as sql:
@@ -854,7 +867,8 @@ class Cache:
 
         """
         now = time.time()
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         expire_time = None if expire is None else now + expire
         mode, db_value = self._disk.to_table_value(value)
         columns = (expire_time, mode, db_value)
@@ -905,7 +919,8 @@ class Cache:
 
         """
         now = time.time()
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         select = "SELECT rowid, expire_time, value FROM Cache WHERE key = ? AND raw = ?"
 
         with self._transact(retry) as sql:
@@ -997,7 +1012,8 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         update_column = EVICTION_POLICY[self.eviction_policy]["get"]
         select = (
             "SELECT rowid, expire_time, mode, value"
@@ -1081,7 +1097,8 @@ class Cache:
 
         """
         sql = self._sql
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         select = (
             "SELECT rowid FROM Cache"
             " WHERE key = ? AND raw = ?"
@@ -1111,7 +1128,8 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
         select = (
             "SELECT rowid, expire_time, mode, value"
             " FROM Cache WHERE key = ? AND raw = ?"
@@ -1154,7 +1172,8 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        db_key, raw = self._disk.to_table_key(key)
+        # db_key, raw = self._disk.to_table_key(key)
+        db_key, raw = key, True
 
         with self._transact(retry) as sql:
             rows = sql(
@@ -1248,7 +1267,8 @@ class Cache:
                     else:
                         break
 
-            key = self._disk.from_table_key(db_key, raw)
+            # key = self._disk.from_table_key(db_key, raw)
+            key = db_key
 
             try:
                 value = self._disk.from_table_value(mode, db_value)
@@ -1347,6 +1367,9 @@ class Cache:
 
             def __cache_key__(*args, **kwargs):
                 """Make key for cache given function arguments."""
+                #     data = pickle.dumps(key, protocol=self.pickle_protocol)
+                #     result = pickletools.optimize(data)
+                #     return sqlite3.Binary(result), False
                 return args_to_key(base, args, kwargs, typed, ignore)
 
             wrapper.__cache_key__ = __cache_key__
@@ -1598,7 +1621,7 @@ class Cache:
         """
         sql = self._sql
         limit = 100
-        _disk_get = self._disk.from_table_key
+        # _disk_get = self._disk.from_table_key
 
         if reverse:
             select = "SELECT key, raw FROM Cache ORDER BY key DESC, raw DESC LIMIT 1"
@@ -1622,7 +1645,8 @@ class Cache:
         else:
             return
 
-        yield _disk_get(key, raw)
+        # yield _disk_get(key, raw)
+        yield (key, raw)
 
         while True:
             rows = sql(iterate, (key, raw, key, limit)).fetchall()
@@ -1631,7 +1655,8 @@ class Cache:
                 break
 
             for key, raw in rows:
-                yield _disk_get(key, raw)
+                # yield _disk_get(key, raw)
+                yield (key, raw)
 
     def _iter(self, ascending=True):
         sql = self._sql
@@ -1644,7 +1669,7 @@ class Cache:
 
         bound = max_rowid + 1
         limit = 100
-        _disk_get = self._disk.from_table_key
+        # _disk_get = self._disk.from_table_key
         rowid = 0 if ascending else bound
         select = (
             "SELECT rowid, key, raw FROM Cache"
@@ -1664,7 +1689,7 @@ class Cache:
                 break
 
             for rowid, key, raw in rows:
-                yield _disk_get(key, raw)
+                yield key
 
     def __iter__(self):
         """Iterate keys in cache including expired items."""

@@ -8,6 +8,8 @@ import os.path as op
 import sqlite3
 import tempfile
 import time
+import zlib
+import struct
 
 from .core import DEFAULT_SETTINGS, ENOVAL, Cache, Disk, Timeout
 from .persistent import Index
@@ -52,7 +54,7 @@ class FanoutCache:
             for num in range(shards)
         )
         self._disk = self._shards[0].disk
-        self._hash = self._shards[0].disk.hash
+        # self._hash = self._shards[0].disk.hash
         self._caches = {}
         self._deques = {}
         self._indexes = {}
@@ -61,6 +63,23 @@ class FanoutCache:
     def directory(self):
         """Cache directory."""
         return self._directory
+
+    def _hash(self, key):
+        mask = 0xFFFFFFFF
+        # disk_key, _ = self.to_table_key(key)
+        disk_key = key
+        type_disk_key = type(disk_key)
+
+        if type_disk_key is sqlite3.Binary or type_disk_key is bytes:
+            return zlib.adler32(disk_key) & mask
+        elif type_disk_key is str:
+            return zlib.adler32(disk_key.encode("utf-8")) & mask  # noqa
+        elif type_disk_key is int:
+            return disk_key % mask
+        elif type_disk_key is float:
+            return zlib.adler32(struct.pack("!d", disk_key)) & mask
+        else:
+            raise ValueError(f"Key type {type_disk_key} is not valid.")
 
     def _get_shard(self, key):
         if self._count == 1:

@@ -433,7 +433,8 @@ def memoize_stampede(cache, expire, name=None, typed=False, beta=1, ignore=()):
 
                 # Check whether a thread has started for early recomputation.
 
-                thread_key = key + (ENOVAL,)
+                # thread_key = key + (ENOVAL,)
+                thread_key = key + b"0"
                 thread_added = cache.add(
                     thread_key,
                     None,

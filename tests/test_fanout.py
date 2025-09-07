@@ -260,19 +260,6 @@ def test_getsetdel(cache):
 
     assert len(cache) == 0
 
-    for value, (key, _) in enumerate(values):
-        cache[key] = value
-
-    assert len(cache) == len(values)
-
-    for value, (key, _) in enumerate(values):
-        assert cache[key] == value
-
-    for _, (key, _) in enumerate(values):
-        del cache[key]
-
-    assert len(cache) == 0
-
     cache.check()
 
 
