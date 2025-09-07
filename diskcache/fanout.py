@@ -54,7 +54,6 @@ class FanoutCache:
             for num in range(shards)
         )
         self._disk = self._shards[0].disk
-        # self._hash = self._shards[0].disk.hash
         self._caches = {}
         self._deques = {}
         self._indexes = {}

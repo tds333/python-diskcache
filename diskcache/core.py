@@ -42,6 +42,7 @@ MODE_RAW = 1
 MODE_BINARY = 2
 MODE_TEXT = 3
 MODE_PICKLE = 4
+MODE_JSON = 5
 
 
 DEFAULT_SETTINGS = {
@@ -52,7 +53,8 @@ DEFAULT_SETTINGS = {
     "sqlite_auto_vacuum": 1,  # FULL
     "sqlite_cache_size": 2**13,  # 8,192 pages
     "sqlite_journal_mode": "wal",
-    "sqlite_mmap_size": 2**26,  # 64mb
+    # "sqlite_mmap_size": 2**26,  # 64mb
+    "sqlite_mmap_size": 2**27,  # 64mb
     # "sqlite_synchronous": 1,  # NORMAL
     "sqlite_synchronous": 0,  # OFF
     # "disk_pickle_protocol": pickle.HIGHEST_PROTOCOL,
@@ -92,12 +94,11 @@ EVICTION_POLICY = {
 
 
 class Disk:
-    """Cache key and value serialization for SQLite database and files."""
+    """Cache value serialization for SQLite database and files."""
 
     def __init__(self, pickle_protocol=None):
         """Initialize disk instance.
 
-        :param str directory: directory path
         :param int pickle_protocol: pickle protocol for serialization
 
         """
@@ -105,68 +106,6 @@ class Disk:
         self.pickle_protocol = (
             pickle.HIGHEST_PROTOCOL if pickle_protocol is None else pickle_protocol
         )
-
-    # def hash(self, key):
-    #     """Compute portable hash for `key`.
-
-    #     :param key: key to hash
-    #     :return: hash value
-
-    #     """
-    #     mask = 0xFFFFFFFF
-    #     # disk_key, _ = self.to_table_key(key)
-    #     disk_key = key
-    #     type_disk_key = type(disk_key)
-
-    #     if type_disk_key is sqlite3.Binary:
-    #         return zlib.adler32(disk_key) & mask
-    #     elif type_disk_key is str:
-    #         return zlib.adler32(disk_key.encode("utf-8")) & mask  # noqa
-    #     elif type_disk_key is int:
-    #         return disk_key % mask
-    #     else:
-    #         assert type_disk_key is float
-    #         return zlib.adler32(struct.pack("!d", disk_key)) & mask
-
-    def to_table_key(self, key):
-        """Convert `key` to fields key and raw for Cache table.
-
-        :param key: key to convert
-        :return: (database key, raw boolean) pair
-
-        """
-        # pylint: disable=unidiomatic-typecheck
-        type_key = type(key)
-
-        if type_key is bytes:
-            return sqlite3.Binary(key), True
-        elif (
-            (type_key is str)
-            or (type_key is int and -9223372036854775808 <= key <= 9223372036854775807)
-            or (type_key is float)
-        ):
-            return key, True
-        # else:
-        #     data = pickle.dumps(key, protocol=self.pickle_protocol)
-        #     result = pickletools.optimize(data)
-        #     return sqlite3.Binary(result), False
-
-    def from_table_key(self, key, raw):
-        """Convert fields `key` and `raw` from Cache table to key.
-
-        :param key: database key to convert
-        :param bool raw: flag indicating raw database storage
-        :return: corresponding Python key
-
-        """
-        # pylint: disable=unidiomatic-typecheck
-        # if raw:
-        #     return bytes(key) if type(key) is sqlite3.Binary else key
-        # return key
-        if raw:
-            return key
-        else:
-            return pickle.load(io.BytesIO(key))
 
     def to_table_value(self, value):
         """Convert `value` to fields mode and value for Cache
@@ -217,7 +156,7 @@ class Disk:
 class JSONDisk(Disk):
     """Cache key and value using JSON serialization with zlib compression."""
 
-    def __init__(self, compress_level=1, **kwargs):
+    def __init__(self, compress_level=1):
         """Initialize JSON disk instance.
 
         Keys and values are compressed using the zlib library. The
@@ -231,29 +170,23 @@ class JSONDisk(Disk):
 
         """
         self.compress_level = compress_level
-        super().__init__(**kwargs)
-
-    # def to_table_key(self, key):
-    #     json_bytes = json.dumps(key).encode("utf-8")
-    #     # data = zlib.compress(json_bytes, self.compress_level)
-    #     data = json_bytes
-    #     return super().to_table_key(data)
-
-    # def from_table_key(self, key, raw):
-    #     data = super().from_table_key(key, raw)
-    #     # return json.loads(zlib.decompress(data).decode("utf-8"))
-    #     return json.loads(data.decode("utf-8"))
 
     def to_table_value(self, value):
-        json_bytes = json.dumps(value).encode("utf-8")
+        # json_data = json.dumps(value).encode("utf-8")
+        json_data = json.dumps(value)
+        return MODE_JSON, json_data
         # value = zlib.compress(json_bytes, self.compress_level)
         value = json_bytes
-        return super().to_table_value(value)
+        # return super().to_table_value(value)
 
     def from_table_value(self, mode, value):
-        data = super().from_table_value(mode, value)
+        # data = super().from_table_value(mode, value)
         # data = json.loads(zlib.decompress(data).decode("utf-8"))
-        data = json.loads(data.decode("utf-8"))
+        if mode == MODE_JSON:
+            # data = json.loads(value.decode("utf-8"))
+            data = json.loads(value)
+        else:
+            data = super().from_table_value(mode, value)
         return data
 
 
@@ -394,20 +327,16 @@ class Cache:
             "CREATE TABLE IF NOT EXISTS Cache ("
             " rowid INTEGER PRIMARY KEY,"
             " key BLOB,"
-            # " raw INTEGER,"
-            " raw BOOL,"
             " store_time REAL,"
             " expire_time REAL,"
             " access_time REAL,"
             " access_count INTEGER DEFAULT 0,"
-            # " tag BLOB,"
-            # " size INTEGER DEFAULT 0,"
-            # " mode INTEGER DEFAULT 0,"
-            " mode INTEGER,"
+            " mode INTEGER DEFAULT 0,"
             " value BLOB)"
         )
 
-        sql("CREATE UNIQUE INDEX IF NOT EXISTS Cache_key_raw ON Cache(key, raw)")
+        # sql("CREATE UNIQUE INDEX IF NOT EXISTS Cache_key_raw ON Cache(key, raw)")
+        sql("CREATE UNIQUE INDEX IF NOT EXISTS Cache_key ON Cache(key)")
 
         sql(
             "CREATE INDEX IF NOT EXISTS Cache_expire_time ON"
@@ -456,13 +385,6 @@ class Cache:
         #     " UPDATE Settings SET value = value - OLD.size"
         #     ' WHERE key = "size"; END'
         # )
-
-        # Create tag index if requested.
-
-        # if self.tag_index:  # pylint: disable=no-member
-        #     self.create_tag_index()
-        # else:
-        #     self.drop_tag_index()
 
         # Close and re-open database connection with given timeout.
         self._timeout = timeout
@@ -588,7 +510,6 @@ class Cache:
     @cl.contextmanager
     def _transact(self, retry=False):
         sql = self._sql
-        # _disk_remove = self._disk.remove
         tid = threading.get_ident()
         txn_id = self._txn_id
 
@@ -637,8 +558,7 @@ class Cache:
 
         """
         now = time.time()
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         expire_time = None if expire is None else now + expire
         mode, db_value = self._disk.to_table_value(value)
         columns = (expire_time, mode, db_value)
@@ -681,9 +601,7 @@ class Cache:
         #     return True
 
         with self._transact(retry) as sql:
-            self._row_upsert(db_key, raw, now, columns)
-
-            # self._cull(now, sql)
+            self._row_upsert(db_key, now, columns)
 
             return True
 
@@ -721,17 +639,16 @@ class Cache:
             ),
         )
 
-    def _row_insert(self, key, raw, now, columns):
+    def _row_insert(self, key, now, columns):
         sql = self._sql
         expire_time, mode, value = columns
         sql(
             "INSERT INTO Cache("
-            " key, raw, store_time, expire_time, access_time,"
+            " key, store_time, expire_time, access_time,"
             " access_count, mode, value"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ") VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 key,
-                raw,
                 now,  # store_time
                 expire_time,
                 now,  # access_time
@@ -741,21 +658,20 @@ class Cache:
             ),
         )
 
-    def _row_upsert(self, key, raw, now, columns):
+    def _row_upsert(self, key, now, columns):
         sql = self._sql
         expire_time, mode, value = columns
         sql(
             "INSERT INTO Cache("
-            " key, raw, store_time, expire_time, access_time,"
+            " key, store_time, expire_time, access_time,"
             " access_count, mode, value"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-            " ON CONFLICT(key, raw) DO UPDATE SET store_time=excluded.store_time,"
+            ") VALUES (?, ?, ?, ?, ?, ?, ?)"
+            " ON CONFLICT(key) DO UPDATE SET store_time=excluded.store_time,"
             " expire_time=excluded.expire_time, access_time=excluded.access_time,"
             " access_count=access_count+1,"
             " mode=excluded.mode, value=excluded.value;",
             (
                 key,
-                raw,
                 now,  # store_time
                 expire_time,
                 now,  # access_time
@@ -823,14 +739,13 @@ class Cache:
 
         """
         now = time.time()
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         expire_time = None if expire is None else now + expire
 
         with self._transact(retry) as sql:
             rows = sql(
-                "SELECT rowid, expire_time FROM Cache WHERE key = ? AND raw = ?",
-                (db_key, raw),
+                "SELECT rowid, expire_time FROM Cache WHERE key = ?",
+                (db_key,),
             ).fetchall()
 
             if rows:
@@ -867,16 +782,15 @@ class Cache:
 
         """
         now = time.time()
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         expire_time = None if expire is None else now + expire
         mode, db_value = self._disk.to_table_value(value)
         columns = (expire_time, mode, db_value)
 
         with self._transact(retry) as sql:
             rows = sql(
-                "SELECT rowid, expire_time FROM Cache WHERE key = ? AND raw = ?",
-                (db_key, raw),
+                "SELECT rowid, expire_time FROM Cache WHERE key = ?",
+                (db_key,),
             ).fetchall()
 
             if rows:
@@ -887,9 +801,7 @@ class Cache:
 
                 self._row_update(rowid, now, columns)
             else:
-                self._row_insert(db_key, raw, now, columns)
-
-            # self._cull(now, sql)
+                self._row_insert(db_key, now, columns)
 
             return True
 
@@ -919,12 +831,11 @@ class Cache:
 
         """
         now = time.time()
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
-        select = "SELECT rowid, expire_time, value FROM Cache WHERE key = ? AND raw = ?"
+        db_key = key
+        select = "SELECT rowid, expire_time, value FROM Cache WHERE key = ?"
 
         with self._transact(retry) as sql:
-            rows = sql(select, (db_key, raw)).fetchall()
+            rows = sql(select, (db_key,)).fetchall()
 
             if not rows:
                 if default is None:
@@ -932,7 +843,7 @@ class Cache:
 
                 value = default + delta
                 columns = (None,) + self._disk.to_table_value(value)
-                self._row_insert(db_key, raw, now, columns)
+                self._row_insert(db_key, now, columns)
                 # self._cull(now, sql)
                 return value
 
@@ -945,7 +856,6 @@ class Cache:
                 value = default + delta
                 columns = (None,) + self._disk.to_table_value(value)
                 self._row_update(rowid, now, columns)
-                # self._cull(now, sql)
                 return value
 
             value += delta
@@ -1012,12 +922,11 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         update_column = EVICTION_POLICY[self.eviction_policy]["get"]
         select = (
             "SELECT rowid, expire_time, mode, value"
-            " FROM Cache WHERE key = ? AND raw = ?"
+            " FROM Cache WHERE key = ?"
             " AND (expire_time IS NULL OR expire_time > ?)"
         )
 
@@ -1027,7 +936,7 @@ class Cache:
         if not self.statistics and update_column is None:
             # Fast path, no transaction necessary.
 
-            rows = self._sql(select, (db_key, raw, time.time())).fetchall()
+            rows = self._sql(select, (db_key, time.time())).fetchall()
 
             if not rows:
                 return default
@@ -1045,7 +954,7 @@ class Cache:
             cache_miss = 'UPDATE Settings SET value = value + 1 WHERE key = "misses"'
 
             with self._transact(retry) as sql:
-                rows = sql(select, (db_key, raw, time.time())).fetchall()
+                rows = sql(select, (db_key, time.time())).fetchall()
 
                 if not rows:
                     if self.statistics:
@@ -1097,15 +1006,14 @@ class Cache:
 
         """
         sql = self._sql
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         select = (
             "SELECT rowid FROM Cache"
-            " WHERE key = ? AND raw = ?"
+            " WHERE key = ?"
             " AND (expire_time IS NULL OR expire_time > ?)"
         )
 
-        rows = sql(select, (db_key, raw, time.time())).fetchall()
+        rows = sql(select, (db_key, time.time())).fetchall()
 
         return bool(rows)
 
@@ -1128,11 +1036,10 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
         select = (
             "SELECT rowid, expire_time, mode, value"
-            " FROM Cache WHERE key = ? AND raw = ?"
+            " FROM Cache WHERE key = ?"
             " AND (expire_time IS NULL OR expire_time > ?)"
         )
 
@@ -1140,7 +1047,7 @@ class Cache:
             default = default, None
 
         with self._transact(retry) as sql:
-            rows = sql(select, (db_key, raw, time.time())).fetchall()
+            rows = sql(select, (db_key, time.time())).fetchall()
 
             if not rows:
                 return default
@@ -1172,15 +1079,14 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
-        # db_key, raw = self._disk.to_table_key(key)
-        db_key, raw = key, True
+        db_key = key
 
         with self._transact(retry) as sql:
             rows = sql(
                 "SELECT rowid FROM Cache"
-                " WHERE key = ? AND raw = ?"
+                " WHERE key = ?"
                 " AND (expire_time IS NULL OR expire_time > ?)",
-                (db_key, raw, time.time()),
+                (db_key, time.time()),
             ).fetchall()
 
             if not rows:
@@ -1239,7 +1145,7 @@ class Cache:
         """
         order = ("ASC", "DESC")
         select = (
-            "SELECT rowid, key, raw, expire_time, mode, value"
+            "SELECT rowid, key, expire_time, mode, value"
             " FROM Cache ORDER BY rowid %s LIMIT 1"
         ) % order[last]
 
@@ -1255,7 +1161,6 @@ class Cache:
                         (
                             rowid,
                             db_key,
-                            raw,
                             db_expire,
                             mode,
                             db_value,
@@ -1267,7 +1172,6 @@ class Cache:
                     else:
                         break
 
-            # key = self._disk.from_table_key(db_key, raw)
             key = db_key
 
             try:
@@ -1367,9 +1271,6 @@ class Cache:
 
             def __cache_key__(*args, **kwargs):
                 """Make key for cache given function arguments."""
-                #     data = pickle.dumps(key, protocol=self.pickle_protocol)
-                #     result = pickletools.optimize(data)
-                #     return sqlite3.Binary(result), False
                 return args_to_key(base, args, kwargs, typed, ignore)
 
             wrapper.__cache_key__ = __cache_key__
@@ -1437,22 +1338,6 @@ class Cache:
                             "UPDATE Settings SET value = ? WHERE key = ?",
                             (count, "count"),
                         )
-
-                # Check Settings.size against sum of Cache.size column.
-
-                # self.reset("size")
-                # select_size = "SELECT COALESCE(SUM(size), 0) FROM Cache"
-                # ((size,),) = sql(select_size).fetchall()
-
-                # if self.size != size:
-                #     message = "Settings.size != SUM(Cache.size); %d != %d"
-                #     warnings.warn(message % (self.size, size))
-
-                #     if fix:
-                #         sql(
-                #             "UPDATE Settings SET value = ? WHERE key =?",
-                #             (size, "size"),
-                #         )
 
             return warns
 
@@ -1621,42 +1506,39 @@ class Cache:
         """
         sql = self._sql
         limit = 100
-        # _disk_get = self._disk.from_table_key
 
         if reverse:
-            select = "SELECT key, raw FROM Cache ORDER BY key DESC, raw DESC LIMIT 1"
+            select = "SELECT key FROM Cache ORDER BY key DESC LIMIT 1"
             iterate = (
-                "SELECT key, raw FROM Cache"
-                " WHERE key = ? AND raw < ? OR key < ?"
-                " ORDER BY key DESC, raw DESC LIMIT ?"
+                "SELECT key FROM Cache"
+                " WHERE key = ? OR key < ?"
+                " ORDER BY key DESC LIMIT ?"
             )
         else:
-            select = "SELECT key, raw FROM Cache ORDER BY key ASC, raw ASC LIMIT 1"
+            select = "SELECT key FROM Cache ORDER BY key ASC LIMIT 1"
             iterate = (
-                "SELECT key, raw FROM Cache"
-                " WHERE key = ? AND raw > ? OR key > ?"
-                " ORDER BY key ASC, raw ASC LIMIT ?"
+                "SELECT key FROM Cache"
+                " WHERE key = ? OR key > ?"
+                " ORDER BY key ASC LIMIT ?"
             )
 
         row = sql(select).fetchall()
 
         if row:
-            ((key, raw),) = row
+            ((key,),) = row
         else:
             return
 
-        # yield _disk_get(key, raw)
-        yield (key, raw)
+        yield key
 
         while True:
-            rows = sql(iterate, (key, raw, key, limit)).fetchall()
+            rows = sql(iterate, (key, key, limit)).fetchall()
 
             if not rows:
                 break
 
-            for key, raw in rows:
-                # yield _disk_get(key, raw)
-                yield (key, raw)
+            for key in rows:
+                yield key
 
     def _iter(self, ascending=True):
         sql = self._sql
@@ -1669,10 +1551,9 @@ class Cache:
 
         bound = max_rowid + 1
         limit = 100
-        # _disk_get = self._disk.from_table_key
         rowid = 0 if ascending else bound
         select = (
-            "SELECT rowid, key, raw FROM Cache"
+            "SELECT rowid, key FROM Cache"
             " WHERE ? < rowid AND rowid < ?"
             " ORDER BY rowid %s LIMIT ?"
         ) % ("ASC" if ascending else "DESC")
@@ -1688,7 +1569,7 @@ class Cache:
             if not rows:
                 break
 
-            for rowid, key, raw in rows:
+            for rowid, key in rows:
                 yield key
 
     def __iter__(self):
@@ -1760,7 +1641,6 @@ class Cache:
         return self.reset("count")
 
     def __getstate__(self):
-        # return (self.directory, self.timeout, type(self.disk))
         return (self.directory, self.timeout, self.disk)
 
     def __setstate__(self, state):
