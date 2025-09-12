@@ -32,26 +32,34 @@ import diskcache  # noqa
 
 caches.append(
     (
-        'diskcache.Cache',
+        "diskcache.Cache",
         diskcache.Cache,
-        ('tmp',),
+        ("tmp",),
         {},
     )
 )
 caches.append(
     (
-        'diskcache.FanoutCache(shards=4, timeout=1.0)',
-        diskcache.FanoutCache,
-        ('tmp',),
-        {'shards': 4, 'timeout': 1.0},
+        "diskcache.CacheEvict",
+        diskcache.Cache,
+        ("tmp",),
+        {"eviction_policy": "none"},
     )
 )
 caches.append(
     (
-        'diskcache.FanoutCache(shards=8, timeout=0.010)',
+        "diskcache.FanoutCache(shards=4, timeout=1.0)",
         diskcache.FanoutCache,
-        ('tmp',),
-        {'shards': 8, 'timeout': 0.010},
+        ("tmp",),
+        {"shards": 4, "timeout": 1.0},
+    )
+)
+caches.append(
+    (
+        "diskcache.FanoutCache(shards=8, timeout=0.010)",
+        diskcache.FanoutCache,
+        ("tmp",),
+        {"shards": 8, "timeout": 0.010},
     )
 )
 
@@ -65,17 +73,17 @@ try:
 
     caches.append(
         (
-            'pylibmc.Client',
+            "pylibmc.Client",
             pylibmc.Client,
-            (['127.0.0.1'],),
+            (["127.0.0.1"],),
             {
-                'binary': True,
-                'behaviors': {'tcp_nodelay': True, 'ketama': True},
+                "binary": True,
+                "behaviors": {"tcp_nodelay": True, "ketama": True},
             },
         )
     )
 except ImportError:
-    warnings.warn('skipping pylibmc')
+    warnings.warn("skipping pylibmc")
 
 
 ###############################################################################
@@ -87,14 +95,14 @@ try:
 
     caches.append(
         (
-            'redis.StrictRedis',
+            "redis.StrictRedis",
             redis.StrictRedis,
             (),
-            {'host': 'localhost', 'port': 6379, 'db': 0},
+            {"host": "localhost", "port": 6379, "db": 0},
         )
     )
 except ImportError:
-    warnings.warn('skipping redis')
+    warnings.warn("skipping redis")
 
 
 def worker(num, kind, args, kwargs):
@@ -107,8 +115,8 @@ def worker(num, kind, args, kwargs):
     timings = co.defaultdict(list)
 
     for count in range(OPS):
-        key = str(random.randrange(RANGE)).encode('utf-8')
-        value = str(count).encode('utf-8') * random.randrange(1, 100)
+        key = str(random.randrange(RANGE)).encode("utf-8")
+        value = str(count).encode("utf-8") * random.randrange(1, 100)
         choice = random.random()
 
         if choice < 0.900:
@@ -116,38 +124,38 @@ def worker(num, kind, args, kwargs):
             result = obj.get(key)
             end = time.time()
             miss = result is None
-            action = 'get'
+            action = "get"
         elif choice < 0.990:
             start = time.time()
             result = obj.set(key, value)
             end = time.time()
             miss = result is False
-            action = 'set'
+            action = "set"
         else:
             start = time.time()
             result = obj.delete(key)
             end = time.time()
             miss = result is False
-            action = 'delete'
+            action = "delete"
 
         if count > WARMUP:
             delta = end - start
             timings[action].append(delta)
             if miss:
-                timings[action + '-miss'].append(delta)
+                timings[action + "-miss"].append(delta)
 
-    with open('output-%d.pkl' % num, 'wb') as writer:
+    with open("output-%d.pkl" % num, "wb") as writer:
         pickle.dump(timings, writer, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def dispatch():
     for name, kind, args, kwargs in caches:
-        shutil.rmtree('tmp', ignore_errors=True)
+        shutil.rmtree("tmp", ignore_errors=True)
 
         obj = kind(*args, **kwargs)
 
         for key in range(RANGE):
-            key = str(key).encode('utf-8')
+            key = str(key).encode("utf-8")
             obj.set(key, key)
 
         try:
@@ -169,9 +177,9 @@ def dispatch():
         timings = co.defaultdict(list)
 
         for num in range(PROCS):
-            filename = 'output-%d.pkl' % num
+            filename = "output-%d.pkl" % num
 
-            with open(filename, 'rb') as reader:
+            with open(filename, "rb") as reader:
                 output = pickle.load(reader)
 
             for key in output:
@@ -182,39 +190,39 @@ def dispatch():
         display(name, timings)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        '-p',
-        '--processes',
+        "-p",
+        "--processes",
         type=int,
         default=PROCS,
-        help='Number of processes to start',
+        help="Number of processes to start",
     )
     parser.add_argument(
-        '-n',
-        '--operations',
+        "-n",
+        "--operations",
         type=float,
         default=OPS,
-        help='Number of operations to perform',
+        help="Number of operations to perform",
     )
     parser.add_argument(
-        '-r',
-        '--range',
+        "-r",
+        "--range",
         type=int,
         default=RANGE,
-        help='Range of keys',
+        help="Range of keys",
     )
     parser.add_argument(
-        '-w',
-        '--warmup',
+        "-w",
+        "--warmup",
         type=float,
         default=WARMUP,
-        help='Number of warmup operations before timings',
+        help="Number of warmup operations before timings",
     )
 
     args = parser.parse_args()

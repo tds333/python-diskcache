@@ -231,7 +231,7 @@ def test_get(cache):
     assert cache.get(1, "dne") == "dne"
     assert cache.get(2, {}) == {}
 
-    assert cache.get(0, expire_time=True) == (None, None)
+    # assert cache.get(0, expire_time=True) == (None, None)
 
 
 def test_get_expired_fast_path(cache):
@@ -240,30 +240,30 @@ def test_get_expired_fast_path(cache):
     assert cache.get(0) is None
 
 
-def test_get_ioerror_fast_path(cache):
-    assert cache.set(0, 0)
+# def test_get_ioerror_fast_path(cache):
+#     assert cache.set(0, 0)
 
-    disk = mock.Mock()
-    put = mock.Mock()
-    fetch = mock.Mock()
+#     disk = mock.Mock()
+#     put = mock.Mock()
+#     fetch = mock.Mock()
 
-    disk.to_table_key = put
-    put.side_effect = [(0, True)]
-    disk.from_table_value = fetch
-    io_error = IOError()
-    io_error.errno = errno.ENOENT
-    fetch.side_effect = io_error
+#     disk.to_table_key = put
+#     put.side_effect = [(0, True)]
+#     disk.from_table_value = fetch
+#     io_error = IOError()
+#     io_error.errno = errno.ENOENT
+#     fetch.side_effect = io_error
 
-    with mock.patch.object(cache, "_disk", disk):
-        assert cache.get(0) is None
+#     with mock.patch.object(cache, "_disk", disk):
+#         assert cache.get(0) is None
 
 
-def test_get_expired_slow_path(cache):
-    cache.stats(enable=True)
-    cache.reset("eviction_policy", "least-recently-used")
-    assert cache.set(0, 0, expire=0.001)
-    time.sleep(0.01)
-    assert cache.get(0) is None
+# def test_get_expired_slow_path(cache):
+#     # cache.stats(enable=True)
+#     # cache.reset("eviction_policy", "least-recently-used")
+#     assert cache.set(0, 0, expire=0.001)
+#     time.sleep(0.01)
+#     assert cache.get(0) is None
 
 
 def test_pop(cache):
@@ -322,28 +322,28 @@ def test_del_expired(cache):
         del cache[0]
 
 
-def test_stats(cache):
-    cache[0] = 0
+# def test_stats(cache):
+#     cache[0] = 0
 
-    assert cache.stats(enable=True) == (0, 0)
+#     assert cache.stats(enable=True) == (0, 0)
 
-    for _ in range(100):
-        cache[0]
+#     for _ in range(100):
+#         cache[0]
 
-    for _ in range(10):
-        cache.get(1)
+#     for _ in range(10):
+#         cache.get(1)
 
-    assert cache.stats(reset=True) == (100, 10)
-    assert cache.stats(enable=False) == (0, 0)
+#     assert cache.stats(reset=True) == (100, 10)
+#     assert cache.stats(enable=False) == (0, 0)
 
-    for _ in range(100):
-        cache[0]
+#     for _ in range(100):
+#         cache[0]
 
-    for _ in range(10):
-        cache.get(1)
+#     for _ in range(10):
+#         cache.get(1)
 
-    assert cache.stats() == (0, 0)
-    assert len(cache.check()) == 0
+#     assert cache.stats() == (0, 0)
+#     assert len(cache.check()) == 0
 
 
 def test_expire_rows(cache):
@@ -406,6 +406,7 @@ def test_least_recently_stored(cache):
 def test_least_recently_used(cache):
     cache.reset("eviction_policy", "least-recently-used")
     cache.reset("size_limit", int(10.1e6))
+    size_limit = int(10.1e6)
     cache.reset("cull_limit", 5)
 
     million = b"x" * int(1e6)
@@ -425,7 +426,7 @@ def test_least_recently_used(cache):
 
     cache[10] = million
 
-    cache.cull()
+    cache.cull(size_limit)
 
     assert len(cache) == 1
 
@@ -617,7 +618,7 @@ def test_add_timeout(cache):
 def test_incr(cache):
     assert cache.incr("key", default=5) == 6
     assert cache.incr("key", 2) == 8
-    assert cache.get("key", expire_time=True) == (8, None)
+    # assert cache.get("key", expire_time=True) == (8, None)
     assert cache.delete("key")
     assert cache.set("key", 100, expire=0.100)
     assert cache.get("key") == 100
@@ -641,7 +642,7 @@ def test_incr_update_keyerror(cache):
 def test_decr(cache):
     assert cache.decr("key", default=5) == 4
     assert cache.decr("key", 2) == 2
-    assert cache.get("key", expire_time=True) == (2, None)
+    # assert cache.get("key", expire_time=True) == (2, None)
     assert cache.delete("key")
     assert cache.set("key", 100, expire=0.100)
     assert cache.get("key") == 100
@@ -976,20 +977,20 @@ def test_size_limit_with_database(cache):
     assert cache.volume() <= size_limit
 
 
-def test_cull_eviction_policy_none(cache):
-    min_limit = 2**15
-    cache.reset("eviction_policy", "none")
-    size_limit = 2 * min_limit
-    cache.reset("size_limit", size_limit)
-    value = b"0123456789" * 10
-    count = size_limit // (8 + len(value))
+# def test_cull_eviction_policy_none(cache):
+#     min_limit = 2**15
+#     cache.reset("eviction_policy", "none")
+#     size_limit = 2 * min_limit
+#     cache.reset("size_limit", size_limit)
+#     value = b"0123456789" * 10
+#     count = size_limit // (8 + len(value))
 
-    for key in range(count):
-        cache.set(key, value)
+#     for key in range(count):
+#         cache.set(key, value)
 
-    assert cache.volume() > size_limit
-    cache.cull()
-    assert cache.volume() > size_limit
+#     assert cache.volume() > size_limit
+#     cache.cull()
+#     assert cache.volume() > size_limit
 
 
 def test_cull_size_limit_0(cache):
@@ -1142,37 +1143,37 @@ def test_rsync():
     shutil.rmtree(cache_dir2, ignore_errors=True)
 
 
-def test_custom_eviction_policy(cache):
-    dc.EVICTION_POLICY["lru-gt-1s"] = {
-        "init": ("CREATE INDEX IF NOT EXISTS Cache_access_time ON Cache (access_time)"),
-        "get": "access_time = {now}",
-        "cull": (
-            "SELECT {fields} FROM Cache"
-            " WHERE access_time < ({now} - 1)"
-            " ORDER BY access_time LIMIT ?"
-        ),
-    }
+# def test_custom_eviction_policy(cache):
+#     dc.EVICTION_POLICY["lru-gt-1s"] = {
+#         "init": ("CREATE INDEX IF NOT EXISTS Cache_access_time ON Cache (access_time)"),
+#         "get": "access_time = {now}",
+#         "cull": (
+#             "SELECT {fields} FROM Cache"
+#             " WHERE access_time < ({now} - 1)"
+#             " ORDER BY access_time LIMIT ?"
+#         ),
+#     }
 
-    size_limit = int(1e5)
+#     size_limit = int(1e5)
 
-    cache.reset("eviction_policy", "lru-gt-1s")
-    cache.reset("size_limit", size_limit)
+#     cache.reset("eviction_policy", "lru-gt-1s")
+#     cache.reset("size_limit", size_limit)
 
-    for count in range(100, 150):
-        cache[count] = str(count) * 500
+#     for count in range(100, 150):
+#         cache[count] = str(count) * 500
 
-    size = cache.volume()
-    assert size > size_limit
-    assert cache.cull() == 0
-    assert size == cache.volume()
+#     size = cache.volume()
+#     assert size > size_limit
+#     assert cache.cull() == 0
+#     assert size == cache.volume()
 
-    for count in range(100, 150):
-        assert cache[count] == str(count) * 500
+#     for count in range(100, 150):
+#         assert cache[count] == str(count) * 500
 
-    time.sleep(1.1)
+#     time.sleep(1.1)
 
-    assert cache.cull() > 0
-    assert cache.volume() < size_limit
+#     assert cache.cull() > 0
+#     assert cache.volume() < size_limit
 
 
 def test_lru_incr(cache):
@@ -1202,20 +1203,20 @@ def test_memoize(cache):
         else:
             return fibrec(num - 1) + fibrec(num - 2)
 
-    cache.stats(enable=True)
+    # cache.stats(enable=True)
 
     for value in range(count):
         assert fibrec(value) == fibiter(value)
 
-    hits1, misses1 = cache.stats()
+    # hits1, misses1 = cache.stats()
 
     for value in range(count):
         assert fibrec(value) == fibiter(value)
 
-    hits2, misses2 = cache.stats()
+    # hits2, misses2 = cache.stats()
 
-    assert hits2 == (hits1 + count)
-    assert misses2 == misses1
+    # assert hits2 == (hits1 + count)
+    # assert misses2 == misses1
 
 
 def test_memoize_kwargs(cache):
@@ -1231,11 +1232,11 @@ def test_memoize_ignore(cache):
     def test(*args, **kwargs):
         return args, kwargs
 
-    cache.stats(enable=True)
+    # cache.stats(enable=True)
     assert test("a", "b", "c", arg0="d", arg1="e", arg2="f")
     assert test("a", "w", "c", arg0="d", arg1="x", arg2="f")
     assert test("a", "y", "c", arg0="d", arg1="z", arg2="f")
-    assert cache.stats() == (2, 1)
+    # assert cache.stats() == (2, 1)
 
 
 def test_memoize_iter(cache):

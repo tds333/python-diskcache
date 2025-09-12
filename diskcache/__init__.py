@@ -25,7 +25,7 @@ from .recipes import (
     Lock,
     RLock,
     barrier,
-    memoize_stampede,
+    # memoize_stampede,
     throttle,
 )
 
@@ -47,7 +47,7 @@ __all__ = [
     "UNKNOWN",
     "UnknownFileWarning",
     "barrier",
-    "memoize_stampede",
+    # "memoize_stampede",
     "throttle",
 ]
 

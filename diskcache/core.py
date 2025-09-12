@@ -46,10 +46,10 @@ MODE_JSON = 5
 
 
 DEFAULT_SETTINGS = {
-    "statistics": 0,  # False
-    "eviction_policy": "least-recently-stored",
+    # "statistics": 0,  # False
+    # "eviction_policy": "least-recently-stored",
     "size_limit": 2**30,  # 1gb
-    "cull_limit": 10,
+    # "cull_limit": 10,
     "sqlite_auto_vacuum": 1,  # FULL
     "sqlite_cache_size": 2**13,  # 8,192 pages
     "sqlite_journal_mode": "wal",
@@ -78,18 +78,18 @@ EVICTION_POLICY = {
         "get": None,
         "cull": "SELECT {fields} FROM Cache ORDER BY store_time LIMIT ?",
     },
-    "least-recently-used": {
-        "init": ("CREATE INDEX IF NOT EXISTS Cache_access_time ON Cache (access_time)"),
-        "get": "access_time = {now}",
-        "cull": "SELECT {fields} FROM Cache ORDER BY access_time LIMIT ?",
-    },
-    "least-frequently-used": {
-        "init": (
-            "CREATE INDEX IF NOT EXISTS Cache_access_count ON Cache (access_count)"
-        ),
-        "get": "access_count = access_count + 1",
-        "cull": "SELECT {fields} FROM Cache ORDER BY access_count LIMIT ?",
-    },
+    # "least-recently-used": {
+    #     "init": ("CREATE INDEX IF NOT EXISTS Cache_access_time ON Cache (access_time)"),
+    #     "get": "access_time = {now}",
+    #     "cull": "SELECT {fields} FROM Cache ORDER BY access_time LIMIT ?",
+    # },
+    # "least-frequently-used": {
+    #     "init": (
+    #         "CREATE INDEX IF NOT EXISTS Cache_access_count ON Cache (access_count)"
+    #     ),
+    #     "get": "access_count = access_count + 1",
+    #     "cull": "SELECT {fields} FROM Cache ORDER BY access_count LIMIT ?",
+    # },
 }
 
 
@@ -329,8 +329,6 @@ class Cache:
             " key BLOB,"
             " store_time REAL,"
             " expire_time REAL,"
-            " access_time REAL,"
-            " access_count INTEGER DEFAULT 0,"
             " mode INTEGER DEFAULT 0,"
             " value BLOB)"
         )
@@ -343,10 +341,10 @@ class Cache:
             " Cache (expire_time) WHERE expire_time IS NOT NULL"
         )
 
-        query = EVICTION_POLICY[self.eviction_policy]["init"]
+        # query = EVICTION_POLICY[self.eviction_policy]["init"]
 
-        if query is not None:
-            sql(query)
+        # if query is not None:
+        #     sql(query)
 
         # Use triggers to keep Metadata updated.
 
@@ -600,7 +598,7 @@ class Cache:
 
         #     return True
 
-        with self._transact(retry) as sql:
+        with self._transact(retry):
             self._row_upsert(db_key, now, columns)
 
             return True
@@ -623,16 +621,12 @@ class Cache:
             "UPDATE Cache SET"
             " store_time = ?,"
             " expire_time = ?,"
-            " access_time = ?,"
-            " access_count = ?,"
             " mode = ?,"
             " value = ?"
             " WHERE rowid = ?",
             (
                 now,  # store_time
                 expire_time,
-                now,  # access_time
-                0,  # access_count
                 mode,
                 value,
                 rowid,
@@ -644,15 +638,13 @@ class Cache:
         expire_time, mode, value = columns
         sql(
             "INSERT INTO Cache("
-            " key, store_time, expire_time, access_time,"
-            " access_count, mode, value"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+            " key, store_time, expire_time,"
+            " mode, value"
+            ") VALUES (?, ?, ?, ?, ?)",
             (
                 key,
                 now,  # store_time
                 expire_time,
-                now,  # access_time
-                0,  # access_count
                 mode,
                 value,
             ),
@@ -663,19 +655,16 @@ class Cache:
         expire_time, mode, value = columns
         sql(
             "INSERT INTO Cache("
-            " key, store_time, expire_time, access_time,"
-            " access_count, mode, value"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?)"
+            " key, store_time, expire_time,"
+            " mode, value)"
+            " VALUES (?, ?, ?, ?, ?)"
             " ON CONFLICT(key) DO UPDATE SET store_time=excluded.store_time,"
-            " expire_time=excluded.expire_time, access_time=excluded.access_time,"
-            " access_count=access_count+1,"
+            " expire_time=excluded.expire_time,"
             " mode=excluded.mode, value=excluded.value;",
             (
                 key,
                 now,  # store_time
                 expire_time,
-                now,  # access_time
-                0,  # access_count
                 mode,
                 value,
             ),
@@ -861,7 +850,8 @@ class Cache:
             value += delta
 
             columns = "store_time = ?, value = ?"
-            update_column = EVICTION_POLICY[self.eviction_policy]["get"]
+            # update_column = EVICTION_POLICY[self.eviction_policy]["get"]
+            update_column = None
 
             if update_column is not None:
                 columns += ", " + update_column.format(now=now)
@@ -923,15 +913,98 @@ class Cache:
 
         """
         db_key = key
-        update_column = EVICTION_POLICY[self.eviction_policy]["get"]
+        # update_column = EVICTION_POLICY[self.eviction_policy]["get"]
+        select = (
+            "SELECT rowid, expire_time, mode, value FROM Cache WHERE key = ?"
+            " AND (expire_time IS NULL OR expire_time > ?)"
+        )
+
+        # if expire_time:
+        #     default = (default, None)
+
+        # Fast path, no transaction necessary.
+
+        rows = self._sql(select, (db_key, time.time())).fetchall()
+        # rows = self._sql(select, (db_key,)).fetchall()
+
+        if not rows:
+            return default
+
+        ((rowid, db_expire_time, mode, db_value),) = rows
+        value = self._disk.from_table_value(mode, db_value)
+
+        # try:
+        #     value = self._disk.from_table_value(mode, db_value)
+        # except IOError:
+        #     # Key was deleted before we could retrieve result.
+        #     return default
+
+        # else:  # Slow path, transaction required.
+        #     cache_hit = 'UPDATE Settings SET value = value + 1 WHERE key = "hits"'
+        #     cache_miss = 'UPDATE Settings SET value = value + 1 WHERE key = "misses"'
+
+        #     with self._transact(retry) as sql:
+        #         rows = sql(select, (db_key, time.time())).fetchall()
+
+        #         if not rows:
+        #             if self.statistics:
+        #                 sql(cache_miss)
+        #             return default
+
+        #         ((rowid, db_expire_time, mode, db_value),) = rows  # noqa: E127
+
+        #         try:
+        #             value = self._disk.from_table_value(mode, db_value)
+        #         except IOError:
+        #             # Key was deleted before we could retrieve result.
+        #             if self.statistics:
+        #                 sql(cache_miss)
+        #             return default
+
+        #         if self.statistics:
+        #             sql(cache_hit)
+
+        #         now = time.time()
+        #         update = "UPDATE Cache SET %s WHERE rowid = ?"
+
+        #         if update_column is not None:
+        #             sql(update % update_column.format(now=now), (rowid,))
+
+        # if expire_time:
+        #     return (value, db_expire_time)
+        # else:
+        return value
+
+    def get_with_expire(
+        self,
+        key,
+        default=None,
+        retry=False,
+    ):
+        """Retrieve value from cache. If `key` is missing, return `default`.
+
+        Raises :exc:`Timeout` error when database timeout occurs and `retry` is
+        `False` (default).
+
+        :param key: key for item
+        :param default: value to return if key is missing (default None)
+        :param bool expire_time: if True, return expire_time in tuple
+            (default False)
+        :param bool retry: retry if database timeout occurs (default False)
+        :return: value for item or default if key not found
+        :raises Timeout: if database timeout occurs
+
+        """
+        db_key = key
+        # update_column = EVICTION_POLICY[self.eviction_policy]["get"]
+        update_column = None
         select = (
             "SELECT rowid, expire_time, mode, value"
             " FROM Cache WHERE key = ?"
             " AND (expire_time IS NULL OR expire_time > ?)"
         )
 
-        if expire_time:
-            default = (default, None)
+        default = (default, None)
 
         if not self.statistics and update_column is None:
             # Fast path, no transaction necessary.
@@ -980,10 +1053,7 @@ class Cache:
                 if update_column is not None:
                     sql(update % update_column.format(now=now), (rowid,))
 
-        if expire_time:
-            return (value, db_expire_time)
-        else:
-            return value
+        return (value, db_expire_time)
 
     def __getitem__(self, key):
         """Return corresponding value for `key` from cache.
@@ -1390,7 +1460,7 @@ class Cache:
         args = [0, now or time.time(), 100]
         return self._select_delete(select, args, row_index=1, retry=retry)
 
-    def cull(self, retry=False):
+    def cull(self, size_limit=None, retry=False):
         """Cull items from cache until volume is less than size limit.
 
         Removing items is an iterative process. In each iteration, a subset of
@@ -1408,6 +1478,10 @@ class Cache:
         :raises Timeout: if database timeout occurs
 
         """
+
+        # 1gb
+        # size_limit = 2**30 if size_limit is None else size_limit
+        size_limit = self.size_limit
         now = time.time()
 
         # Remove expired items.
@@ -1416,7 +1490,8 @@ class Cache:
 
         # Remove items by policy.
 
-        select_policy = EVICTION_POLICY[self.eviction_policy]["cull"]
+        select_policy = "SELECT {fields} FROM Cache ORDER BY store_time LIMIT ?"
+        # select_policy = EVICTION_POLICY[self.eviction_policy]["cull"]
 
         if select_policy is None:
             return 0
@@ -1424,7 +1499,7 @@ class Cache:
         select_rowid = select_policy.format(fields="rowid", now=now)
 
         try:
-            while self.volume() > self.size_limit:
+            while self.volume() > size_limit:
                 with self._transact(retry) as sql:
                     rows = sql(select_rowid, (10,)).fetchall()
 
@@ -1584,24 +1659,24 @@ class Cache:
         next(iterator)
         return iterator
 
-    def stats(self, enable=True, reset=False):
-        """Return cache statistics hits and misses.
+    # def stats(self, enable=True, reset=False):
+    #     """Return cache statistics hits and misses.
 
-        :param bool enable: enable collecting statistics (default True)
-        :param bool reset: reset hits and misses to 0 (default False)
-        :return: (hits, misses)
+    #     :param bool enable: enable collecting statistics (default True)
+    #     :param bool reset: reset hits and misses to 0 (default False)
+    #     :return: (hits, misses)
 
-        """
-        # pylint: disable=E0203,W0201
-        result = (self.reset("hits"), self.reset("misses"))
+    #     """
+    #     # pylint: disable=E0203,W0201
+    #     result = (self.reset("hits"), self.reset("misses"))
 
-        if reset:
-            self.reset("hits", 0)
-            self.reset("misses", 0)
+    #     if reset:
+    #         self.reset("hits", 0)
+    #         self.reset("misses", 0)
 
-        self.reset("statistics", enable)
+    #     self.reset("statistics", enable)
 
-        return result
+    #     return result
 
     def volume(self):
         """Return estimated total size of cache on disk.

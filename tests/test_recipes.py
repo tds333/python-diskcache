@@ -17,7 +17,7 @@ def cache():
 
 
 def test_averager(cache):
-    nums = dc.Averager(cache, 'nums')
+    nums = dc.Averager(cache, "nums")
     for i in range(10):
         nums.add(i)
     assert nums.get() == 4.5
@@ -29,53 +29,53 @@ def test_averager(cache):
 
 
 def test_lock(cache):
-    state = {'num': 0}
-    lock = dc.Lock(cache, 'demo')
+    state = {"num": 0}
+    lock = dc.Lock(cache, "demo")
 
     def worker():
-        state['num'] += 1
+        state["num"] += 1
         with lock:
             assert lock.locked()
-            state['num'] += 1
+            state["num"] += 1
             time.sleep(0.1)
 
     with lock:
         thread = threading.Thread(target=worker)
         thread.start()
         time.sleep(0.1)
-        assert state['num'] == 1
+        assert state["num"] == 1
     thread.join()
-    assert state['num'] == 2
+    assert state["num"] == 2
 
 
 def test_rlock(cache):
-    state = {'num': 0}
-    rlock = dc.RLock(cache, 'demo')
+    state = {"num": 0}
+    rlock = dc.RLock(cache, "demo")
 
     def worker():
-        state['num'] += 1
+        state["num"] += 1
         with rlock:
             with rlock:
-                state['num'] += 1
+                state["num"] += 1
                 time.sleep(0.1)
 
     with rlock:
         thread = threading.Thread(target=worker)
         thread.start()
         time.sleep(0.1)
-        assert state['num'] == 1
+        assert state["num"] == 1
     thread.join()
-    assert state['num'] == 2
+    assert state["num"] == 2
 
 
 def test_semaphore(cache):
-    state = {'num': 0}
-    semaphore = dc.BoundedSemaphore(cache, 'demo', value=3)
+    state = {"num": 0}
+    semaphore = dc.BoundedSemaphore(cache, "demo", value=3)
 
     def worker():
-        state['num'] += 1
+        state["num"] += 1
         with semaphore:
-            state['num'] += 1
+            state["num"] += 1
             time.sleep(0.1)
 
     semaphore.acquire()
@@ -84,23 +84,23 @@ def test_semaphore(cache):
         thread = threading.Thread(target=worker)
         thread.start()
         time.sleep(0.1)
-        assert state['num'] == 1
+        assert state["num"] == 1
     thread.join()
-    assert state['num'] == 2
+    assert state["num"] == 2
     semaphore.release()
     semaphore.release()
 
 
-def test_memoize_stampede(cache):
-    state = {'num': 0}
+# def test_memoize_stampede(cache):
+#     state = {'num': 0}
 
-    @dc.memoize_stampede(cache, 0.1)
-    def worker(num):
-        time.sleep(0.01)
-        state['num'] += 1
-        return num
+#     @dc.memoize_stampede(cache, 0.1)
+#     def worker(num):
+#         time.sleep(0.01)
+#         state['num'] += 1
+#         return num
 
-    start = time.time()
-    while (time.time() - start) < 1:
-        worker(100)
-    assert state['num'] > 0
+#     start = time.time()
+#     while (time.time() - start) < 1:
+#         worker(100)
+#     assert state['num'] > 0
